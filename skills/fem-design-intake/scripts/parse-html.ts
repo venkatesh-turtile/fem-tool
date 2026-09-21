@@ -35,6 +35,13 @@ if (!existsSync(srcDir)) {
 	process.exit(2);
 }
 
+// Which kinds of institution this repo analyses, and how a design marks each
+// one. A marker is a CSS fragment — the 3D designs switch with a class on the
+// body — so a rule naming it belongs to that variant.
+const SCOPE = CFG.institutionScope ?? {};
+const IN_SCOPE: string[] = SCOPE.inScope ?? [];
+const VARIANT_MARKERS: Record<string, string> = SCOPE.variantMarkers ?? {};
+
 // NFR-3: ids derive from the screen name, not file order.
 const shortId = (v: string) =>
 	createHash("sha256").update(v).digest("hex").slice(0, 6);
@@ -146,6 +153,8 @@ type Hidden = {
 	columnIndex: number | null;
 	shownTo: string | null;
 	reason: string | null;
+	hiddenFrom: string | null;
+	inScope: boolean;
 };
 
 function hiddenByCss(raw: string): Hidden[] {
@@ -194,12 +203,29 @@ function hiddenByCss(raw: string): Hidden[] {
 					}
 					continue;
 				}
+				// A display:none rule says who does NOT see this, so the marker
+				// names the kind it is hidden FROM — and the element belongs to
+				// everyone else. Read the other way round it inverts: the rule
+				// hiding a column from schools is a college's column.
+				let hiddenFrom: string | null = null;
+				for (const [kind, marker] of Object.entries(VARIANT_MARKERS)) {
+					if (marker && one.includes(marker)) {
+						hiddenFrom = kind;
+					}
+				}
+				// Out of scope only when nobody we analyse would ever see it.
+				const unseen =
+					hiddenFrom !== null &&
+					IN_SCOPE.length > 0 &&
+					IN_SCOPE.every((k) => k === hiddenFrom);
 				found.set(key, {
 					selector: one,
 					table,
 					columnIndex: nth?.[1] ? Number.parseInt(nth[1], 10) : null,
 					shownTo,
 					reason,
+					hiddenFrom,
+					inScope: !unseen,
 				});
 			}
 		}
@@ -305,7 +331,22 @@ files.forEach((f, i) => {
 	// a change catalogue is built from, and a column nobody sees is not a
 	// column the backend has to serve.
 	const hidden = hiddenByCss(raw);
-	const hiddenCols = hidden.filter((x) => x.columnIndex !== null);
+	const allHiddenCols = hidden.filter((x) => x.columnIndex !== null);
+	const hiddenCols = allHiddenCols.filter((x) => x.inScope);
+	const outOfScope = allHiddenCols.filter((x) => !x.inScope);
+	if (outOfScope.length > 0) {
+		questions.push(
+			`${f}: **${outOfScope.length} column(s) belong to a variant this repo does not analyse** ` +
+				`(in scope: ${IN_SCOPE.join(", ") || "all"}). They are NOT change items and carry no days — ` +
+				"mention them once as deliberately not built, and move on:\n" +
+				outOfScope
+					.map(
+						(x) =>
+							`  - column ${x.columnIndex}${x.table ? ` of the \`${x.table}\` table` : ""} — hidden from ${x.hiddenFrom}, and ${x.hiddenFrom} is all we analyse`
+					)
+					.join("\n")
+		);
+	}
 	if (hiddenCols.length > 0) {
 		questions.push(
 			`${f}: **${hiddenCols.length} column(s) are declared but hidden in CSS.** ` +

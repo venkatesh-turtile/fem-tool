@@ -30,7 +30,11 @@ Where the two screen specs meet.
    sends a subagent tracing an endpoint for a button that changed colour.
    Mis-tagging the reverse hides real cost. **`V0` still costs L10** — e2e
    selectors change even when nothing server-side does.
-5. **Decide the institution shape the design assumes.** Every design so far has
+5. **Decide the institution shape the design assumes** — within the kinds
+   `fem.config.json` lists under `institutionScope.inScope`. A variant drawn for
+   a kind that is not listed is out of scope and is not catalogued at all; say
+   so once and move on.
+    Every design so far has
    been school-shaped — Level/Grade/Section, "Class 1", Day care … Senior
    secondary. The product is not: the hierarchy is template-driven, and
    `public/programmes`, `exam-module/reports/university-excel` and
