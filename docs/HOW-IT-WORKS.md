@@ -306,6 +306,27 @@ what catches it if this ever regresses.
 
 ---
 
+## 4b · How a screen finds its data
+
+A route and the folder its code lives in are two different things. `/academic-
+structure` is served entirely out of `modules/academic-nodes`, and the index
+used to match a screen to its data **by name** — so for that module it matched
+nothing and reported four screens with no endpoints and no tables. Acceptance
+passed, because zero of zero resolved counts as perfect.
+
+The index now records, for every page, the module **files** it can reach in
+three hops — page → component → hook or api client — and the baseline selects
+bindings from those files. Files, not modules: a screen that imports one
+component from HRMS reaches that component, not the two hundred bindings in
+HRMS.
+
+Three hops, not four: four reached the dashboard statistics and setup-progress
+endpoints from the academic calendar, which that screen does not show.
+
+And a module whose screens reach **no** server schema at all now fails and stops
+the run, because a silent zero is indistinguishable from a screen that genuinely
+calls nothing.
+
 ## 5 · P2 · design intake — the blocked step
 
 Parses the new HTML into the same screen spec, raises **ambiguity questions**

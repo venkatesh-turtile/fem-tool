@@ -146,6 +146,25 @@ if (want("P2") && existsSync(join(dir, "02-new-design.json"))) {
 }
 
 // ── P4 · impact ──────────────────────────────────────────────────────────────
+// The screens that actually exist, from the two specs that define them.
+const knownScreens = new Set<string>();
+for (const [file, at] of [
+	["01-baseline.json", join(dir, "01-baseline.json")],
+	["02-new-design.json", join(dir, "02-new-design.json")],
+] as [string, string][]) {
+	if (!existsSync(at)) {
+		continue;
+	}
+	const doc = JSON.parse(readFileSync(at, "utf8"));
+	const screens = doc.spec?.screens ?? doc.screens ?? [];
+	for (const sc of screens) {
+		if (sc?.id) {
+			knownScreens.add(sc.id as string);
+		}
+	}
+	void file;
+}
+
 if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 	const doc = read("04-impact.json");
 	validate(doc, loadSchema("impact.schema.json"), "04-impact");
@@ -175,6 +194,18 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 			err(
 				`${id}: ${kind} carries no L10 — visual-only changes still need an e2e spec (§6.1)`
 			);
+		}
+		// M · a change that points at a screen nobody has seen.
+		// Screen ids are content hashes, so one typed from memory looks exactly
+		// like one that was read. This was written after a whole trace was
+		// filed against an invented id and every other check passed.
+		for (const side of ["old", "new"] as const) {
+			const sid = (c.screen as Record<string, string | null>)?.[side];
+			if (sid && !knownScreens.has(sid)) {
+				err(
+					`${id}: screen.${side} is "${sid}", which is not a screen in ${side === "old" ? "01-baseline.json" : "02-new-design.json"}`
+				);
+			}
 		}
 		// L · "nobody else uses this" written for free.
 		// A change that alters the contract, the handler or the schema can break
