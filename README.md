@@ -190,6 +190,17 @@ reference tables.
 
 `fem.config.json` has two halves.
 
+**Who you serve** — `institutionScope.inScope` lists the kinds of institution
+you analyse for. Designs often draw more than one variant out of one file — a
+school and a college, switched by a class on the page — and pricing a variant
+nobody asked for is waste that reads like agreed work.
+
+Leave the list **empty** and every variant is analysed, which is the right
+default. Narrow it when you know you only serve some of them, and widen it again
+the day you do: a college design analysed by a repo listing only `school` would
+report almost nothing, so the list has to follow the business, not the other way
+round.
+
 **Where things are** — change these for your repo: `paths`, `apps`, `server`
 (including the import alias the front end uses for server schemas), `e2e`,
 `observability`, `consumerApps`.

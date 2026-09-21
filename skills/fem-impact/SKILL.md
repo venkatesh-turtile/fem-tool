@@ -41,9 +41,27 @@ The phase that turns differences into backend work.
 9. **Name the rubric keys** each layer needs, in `impact.LN.rubric`, so
    `compute-estimate.ts` can price it deterministically.
 
-## Institution shape — required for every module
+## Institution shape — settled once, in the config
 
-**Ask of every design: does this still work for a college?** The answer is not
+`fem.config.json` names the kinds of institution **this repo** analyses, under
+`institutionScope.inScope`. It is a setting, not a property of the workflow:
+empty means analyse every variant a design contains, and a repo that later
+starts serving another kind adds it to the list and re-runs. The workflow has no
+opinion about which kinds exist — it reads the design and the config. **A design drawing a variant for a kind that is not
+listed is out of scope: not catalogued, not traced, not priced.** The 3D designs
+switch variants themselves — `document.body.classList.toggle('coll',
+isCollege())` — so both halves sit in the same file and the wrong one is easy to
+pick up by mistake. `fem-design-intake` marks each hidden element with the
+variant it belongs to and tells you which are out of scope; honour that.
+
+An out-of-scope variant is worth **one line** in the report, as something
+deliberately not built. It is never a change item and never carries days.
+
+When a design serves a kind that IS in scope badly — a school-shaped screen for
+a school whose shape does not fit — that is still a finding, and the rest of this
+section applies.
+
+**Ask of every design: does this still work for the kinds in scope?** The answer is not
 optional and does not belong only in prose — it is a finding with evidence,
 like any other.
 

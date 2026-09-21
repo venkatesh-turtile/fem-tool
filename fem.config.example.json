@@ -25,6 +25,14 @@
 			"modules": "apps/admin/modules"
 		}
 	},
+	"institutionScope": {
+		"$comment": "Which kinds of institution you analyse for. A design that draws more than one variant \u2014 a school and a college out of the same file, switched by a class on the page \u2014 is analysed only for the kinds listed here; anything drawn for a kind you do not list is reported once as deliberately not built and carries no days. Leave the list EMPTY to analyse every variant a design contains, which is the right default until you know you only serve some of them. Add a marker for any variant your designs use.",
+		"inScope": [],
+		"variantMarkers": {
+			"college": "body.coll",
+			"school": "body:not(.coll)"
+		}
+	},
 	"server": {
 		"root": "apps/server/src",
 		"alias": "@server/",
