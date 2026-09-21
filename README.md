@@ -1,23 +1,32 @@
 # Frontend Migration Impact Workflow
 
-> **One command, nothing to clone.** Stand in the repo you want it in:
->
-> ```bash
-> curl -fsSL https://raw.githubusercontent.com/venkatesh-turtile/fem-tool/main/install.sh | bash
-> ```
->
-> Then, in Claude Code inside that repo:
->
-> ```
-> /fem-run cms academic-calendar ~/Downloads/Academic_Calendar.html
-> ```
->
-> Prefer a clone — to read it first, or to work on it? That works too:
->
-> ```bash
-> git clone https://github.com/venkatesh-turtile/fem-tool.git ~/fem-tool
-> ~/fem-tool/install.sh /path/to/your-repo
-> ```
+## Install — two ways, same result
+
+**Without a clone.** This is the one to send a teammate:
+
+```bash
+cd /path/to/your-repo
+curl -fsSL https://raw.githubusercontent.com/venkatesh-turtile/fem-tool/main/install.sh | bash
+```
+
+**With a clone.** The right way if you want to read the skills before running
+them, or change them:
+
+```bash
+git clone https://github.com/venkatesh-turtile/fem-tool.git ~/fem-tool
+~/fem-tool/install.sh /path/to/your-repo    # or no argument, from inside the repo
+```
+
+Either way you get the same fourteen skills in `.claude/skills/` and a starter
+`fem.config.json`. Run from a clone, the script copies from that clone and never
+touches the network — so a change you are testing is the change that gets
+installed.
+
+Then, in Claude Code from inside your repo:
+
+```
+/fem-run cms academic-calendar ~/Downloads/Academic_Calendar.html
+```
 
 You have a new design for a screen. Before anyone builds it, you want to know:
 **does this need backend work, and what does it cost?**
@@ -54,47 +63,35 @@ Database and API changes are the obvious ones. The ones teams miss:
   that alters an API or a table cannot claim "no one else is affected" without
   naming what it checked.
 
-## Setting it up, step by step
+## More about installing
 
-There are two ways in, and they install exactly the same thing.
+Both commands above do the same three things and nothing else: copy the fourteen
+`fem-*` skills into `<repo>/.claude/skills/`, drop in a starter
+`fem.config.json` if you have none, and stop. No git operations, no
+dependencies, no build, no other file touched.
 
-**The short way — no clone.** Stand in the repo you want the tool in and run:
+The no-clone version downloads this repo into a temporary folder and deletes it
+afterwards. Piped through a shell there is no argument to read, so it installs
+into the **current directory** — it warns you if that directory has no `.git`
+and no `package.json`, which is the one way to get this wrong quietly.
 
-```bash
-cd /path/to/your-repo
-curl -fsSL https://raw.githubusercontent.com/venkatesh-turtile/fem-tool/main/install.sh | bash
-```
+**Updating** is the same command again. Your `fem.config.json` is never
+overwritten.
 
-It downloads this repo to a temporary folder, copies the fourteen `fem-*` skills
-into `.claude/skills/`, drops in a starter `fem.config.json` if you have none,
-and deletes the temporary folder. Nothing else is touched: no git operations, no
-dependencies, no build. Run it again whenever you want the latest — your
-`fem.config.json` is left alone.
-
-Pin a branch or a fork if you need to:
+**Pinning a branch or a fork:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/venkatesh-turtile/fem-tool/main/install.sh \
   | FEM_REF=some-branch bash
 ```
 
-**The long way — clone it.** Better if you want to read the skills before
-running them, or change them. Clone it *outside* the repo you will analyse; one
-git repository inside another only causes confusion later.
+### After installing
 
-```bash
-git clone https://github.com/venkatesh-turtile/fem-tool.git ~/fem-tool
-~/fem-tool/install.sh /path/to/your-repo     # or run it with no argument from inside the repo
-```
+**Check the config.** `fem.config.json` has two halves. The top says where your
+apps, server, tests and dashboards live — change it for your repo. The bottom is
+the estimating rubric; leave it alone unless you are calibrating.
 
-Run from a clone, the script copies from that clone and never touches the
-network — so a change you are testing is the change that gets installed.
-
-**3 · Check the config.** `fem.config.json` has two halves. The top says where
-your apps, server, tests and dashboards live — change it for your repo. The
-bottom is the estimating rubric; leave it alone unless you are calibrating.
-
-**4 · Decide whether the tool belongs in your history.** The skills land as
+**Decide whether the tool belongs in your git history.** The skills land as
 untracked files, and `.claude/skills/**` is not ignored in every repo. If you do
 not want them committed:
 
@@ -103,17 +100,14 @@ cd /path/to/your-repo
 printf '.claude/skills/fem-*\nfem.config.json\n' >> .git/info/exclude
 ```
 
-**5 · Run it.** In Claude Code, from inside your repo:
+**Then run it.** In Claude Code, from inside your repo:
 
 ```
 /fem-run <app> <module> ~/Downloads/<design>.html
 ```
 
 Nothing else to prepare — no index to build, no folders to create, no design to
-file by hand. The run does all of it.
-
-**Updating later:** run the same one-liner again, or `git -C ~/fem-tool pull`
-and re-run `install.sh`. Your `fem.config.json` is left as it is.
+file by hand. The run does all of it, and asks you whatever it cannot decide.
 
 ## Use
 
@@ -123,7 +117,9 @@ In Claude Code, point it at the design wherever it happens to be:
 /fem-run cms academic-calendar ~/Downloads/Academic_Calendar_v4.html
 ```
 
-Then approve the two gates when asked. That is the whole thing.
+Then answer what it asks and approve the two gates. It asks in the terminal, one
+question at a time, with options — and your own answer is always welcome. That
+is the whole thing.
 
 The run files the design under its module, creates the results folder, and — if
 a run already exists for an older design — archives that run and its design
