@@ -34,13 +34,26 @@ it is machinery to make this sheet defensible.
 4. **Never Reject without an alternative.** *"4.0 days of lifecycle rewrite for a
    status label — here is a display-only version for 0.5"* is a negotiation.
    *"Rejected"* is a wall.
-5. **Block items with unanswered questions.** §9.3 puts them at ×2.0. They
-   cannot be bucketed honestly — say so rather than guessing.
-6. **Say who the design is for.** If it assumes a school shape, the decisions
+5. **Answer the mandatory questions before presenting anything.** §9.3 puts a
+   blocked item at ×2.0, and an item at ×2.0 cannot be bucketed honestly. So
+   before writing the sheet, ask whatever is still open — in the terminal, one
+   `AskUserQuestion` call per question, per
+   `.claude/skills/fem-shared/asking-questions.md`. Gate 2 is **refused** while a
+   mandatory question is neither answered nor explicitly left open; the
+   validator enforces it. An item whose question is deliberately left open is
+   bucketed **Defer**, never Take, and the sheet says what it is waiting on.
+   Every answer collected here goes through
+   `.claude/skills/fem-shared/answer-consequences.md` before the sheet is
+   written — an answer at this stage can still move an item from Take to
+   Take-variant, or reverse an earlier recommendation.
+6. **Open the sheet with what the answers did**, when any were given: the before
+   and after numbers, and the answers that changed the work. A reader who sees
+   only the final number cannot tell a confident estimate from a lucky one.
+7. **Say who the design is for.** If it assumes a school shape, the decisions
    sheet states which institutions **cannot** use the screen and what they get
    instead — today's page, a second design, or nothing. UX is choosing the
    customer set, whether or not anyone says so out loud.
-7. **Write for UX, not for engineering.** `06-decisions.md` names screens and
+8. **Write for UX, not for engineering.** `06-decisions.md` names screens and
    options, not handlers and indexes. The reason for a cost can be one clause
    — *"needs an index on a hot table"* — not a paragraph.
 

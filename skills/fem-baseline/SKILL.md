@@ -38,9 +38,12 @@ emits for the new designs, so P3 can diff them directly.
 4. **Resolve each binding** through `_index/endpoints.json` to a server path,
    method and table. Cite the endpoint id.
 
-5. **Report L12 honestly.** `none` from the index means *no web consumer*. The
-   index sees cross-app use only where an app imports a server Zod schema, and
-   `apps/student` imports none. Never write "no consumers" unqualified.
+5. **Report L12 honestly, from `table-readers.json`.** `none` in
+   `consumers.json` means *no web consumer* — it sees cross-app use only where an
+   app imports a server Zod schema. The list that matters is
+   `_index/table-readers.json`: for each table this module touches, which server
+   modules read it. Name them in the baseline. Never write "no consumers"
+   unqualified.
 
 ## The trap worth knowing
 

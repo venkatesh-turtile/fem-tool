@@ -176,6 +176,23 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 				`${id}: ${kind} carries no L10 — visual-only changes still need an e2e spec (§6.1)`
 			);
 		}
+		// L · "nobody else uses this" written for free.
+		// A change that alters the contract, the handler or the schema can break
+		// a reader. Saying none is allowed; saying it without having looked is
+		// not — the index's table-readers answers this mechanically now, so
+		// there is no excuse for an unevidenced none.
+		const touchesData = ["L1", "L3", "L4"].some(
+			(L) => !String(impact[L]?.change ?? "none").startsWith("none")
+		);
+		const l12 = impact.L12 ?? {};
+		const l12None = String(l12.change ?? "none").startsWith("none");
+		const l12Justified =
+			((l12.evidence as string[]) ?? []).length > 0 || Boolean(l12.searched);
+		if (touchesData && l12None && !l12Justified) {
+			err(
+				`${id} L12: says no consumer is affected, but cites nothing. Name the modules that read the tables this change touches (_index/table-readers.json), or say what was searched`
+			);
+		}
 		// C · a rubric key must exist in fem.config.json for that layer
 		for (const L of LAYERS) {
 			for (const key of (impact[L]?.rubric as string[]) ?? []) {
@@ -263,6 +280,119 @@ const SUMMARY_SECTIONS = [
 	"## How sure we are",
 	"## Exactly what changes",
 ];
+// K · the three sentences drifted apart.
+// They are written once and carried into three files unchanged, so a reader
+// meets the same answer wherever they look. Re-tracing after an answer usually
+// rewrites one of them, and rewriting one of three is how a summary ends up
+// promising a free option the impact document has already ruled out.
+if (want("P8")) {
+	const said = new Map<string, string>();
+	for (const file of ["04-impact.md", "questions.md", "SUMMARY.md"]) {
+		const at = join(dir, file);
+		if (!existsSync(at)) {
+			continue;
+		}
+		const text = readFileSync(at, "utf8");
+		const hit = /\*\*Needs a server change:\*\*([\s\S]*?)\n\n/.exec(text);
+		if (hit?.[1]) {
+			said.set(file, hit[1].replace(/\s+/g, " ").trim());
+		}
+	}
+	const distinct = new Set(said.values());
+	if (said.size > 1 && distinct.size > 1) {
+		err(
+			`the "Needs a server change" sentence differs between ${[...said.keys()].join(", ")} — one sentence, three homes. If it changed, change it everywhere`
+		);
+	}
+}
+
+// H, I, J · an answer that never reached the trace.
+// Each of these happened by hand before it was automated: an item left marked
+// blocked on a question that had been answered; a trace older than the answers
+// it was supposed to reflect; and a number that silently improved with nothing
+// saying why. See fem-shared/answer-consequences.md.
+if (want("P5") || want("P6") || want("P8")) {
+	const statePath = join(dir, "state.json");
+	const impactPath = join(dir, "04-impact.json");
+	if (existsSync(statePath) && existsSync(impactPath)) {
+		const state = JSON.parse(readFileSync(statePath, "utf8"));
+		const answers: Record<string, { at?: string; choice?: string }> =
+			state.answers ?? {};
+		const answered = new Set(
+			Object.entries(answers)
+				.filter(([, a]) => a.choice !== "open")
+				.map(([q]) => q)
+		);
+		if (answered.size > 0) {
+			const impact = JSON.parse(readFileSync(impactPath, "utf8"));
+			// H · answered, but the item still says it is waiting
+			for (const c of impact.changes ?? []) {
+				for (const [L, layer] of Object.entries(
+					(c.impact ?? {}) as Record<string, { blockedOnQuestion?: string }>
+				)) {
+					const q = layer?.blockedOnQuestion;
+					if (q && answered.has(q)) {
+						err(
+							`${c.id} ${L}: blocked on ${q}, which has been answered — re-trace the item with the answer in hand, then re-run P5`
+						);
+					}
+				}
+			}
+			// I · the trace predates the answers it should reflect.
+			// Recorded times, not file mtimes: a copy or a checkout rewrites an
+			// mtime and would quietly disarm this.
+			const tracedAt = state.phaseTimes?.P4
+				? Date.parse(state.phaseTimes.P4)
+				: Number.NaN;
+			if (!Number.isNaN(tracedAt)) {
+				for (const [q, a] of Object.entries(answers)) {
+					const at = a.at ? Date.parse(a.at) : Number.NaN;
+					if (!Number.isNaN(at) && at > tracedAt) {
+						err(
+							`the answer to ${q} was given after P4 was recorded — the trace cannot reflect it. Re-trace the items that named it, re-run P5, then record P4 again`
+						);
+						break;
+					}
+				}
+			}
+			// J · a number that moved, with nothing saying why
+			const impactMd = join(dir, "04-impact.md");
+			if (
+				existsSync(impactMd) &&
+				!readFileSync(impactMd, "utf8").includes("What the answers changed")
+			) {
+				err(
+					'04-impact.md: answers were recorded but there is no "What the answers changed" section — say what moved, and which answers changed the work rather than confirming it'
+				);
+			}
+		}
+	}
+}
+
+// G · a mandatory question reached gate 2 with nobody having answered it.
+// The whole point of asking in the terminal is that this can no longer happen
+// by drift: an item blocked on an unanswered question is priced at x2.0, and a
+// sheet built on x2.0 numbers reads as a decision when it is a shrug.
+if (want("P6")) {
+	const questionsAt = join(dir, "questions.md");
+	if (existsSync(questionsAt)) {
+		const blocks = readFileSync(questionsAt, "utf8").split(/^###\s+/m).slice(1);
+		for (const block of blocks) {
+			if (!block.includes("**Mandatory**")) {
+				continue;
+			}
+			const answered =
+				block.includes("**Answer") || block.includes("**Left open:**");
+			if (!answered) {
+				const title = (block.split("\n")[0] ?? "").trim();
+				err(
+					`questions.md: "${title}" is mandatory and unanswered — ask it in the terminal and record it with record-answer.ts, or record it as left open. Gate 2 cannot be presented on a guess`
+				);
+			}
+		}
+	}
+}
+
 if (want("P8")) {
 	const reportAt = join(dir, "REPORT.md");
 	if (

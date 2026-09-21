@@ -89,10 +89,16 @@ P8  fem-report           REPORT.md                16:32
      fem-run             state.json               updated after each phase
 ```
 
-**`questions.md` is not one phase's file.** P2 creates it when the design
-leaves something unclear. Later phases add to it whenever they hit something
-they cannot answer. That is why its time in this run is 16:26, after P5, and
-not 15:56 when P2 ran.
+**`questions.md` is not one phase's file.** P2 creates it when the design leaves
+something unclear. Later phases add to it whenever they hit something they
+cannot answer. That is why its time in this run is 16:26, after P5, and not
+15:56 when P2 ran.
+
+**You are asked, not emailed.** Each phase asks its own questions in the
+terminal, with options, before it records itself as done — P2 the design's, P3
+the comparison's, P4 what tracing turned up, P6 whatever is left. You pick an
+option, type your own answer, or leave it open. The file is the record of what
+was asked and what you said, not a to-do list.
 
 **Each file feeds the next phase:**
 
@@ -260,8 +266,10 @@ Each difference gets an id and a type:
 
 **You reply:** `approved`, or give corrections.
 
-**Also answer `questions.md` now if you can.** Every unanswered question makes
-the estimate range wider.
+**P3 asks its own questions before this gate** — whether the design still fits
+a college, whether a capability is really removed or only moved. Answer them in
+the terminal as they come; each one is a pick, and your own answer is always
+allowed.
 
 **Next:** P4.
 
@@ -445,11 +453,16 @@ bun .claude/skills/fem-run/scripts/validate-outputs.ts cms <module>
 
 ## Tips from the first run (academic-calendar)
 
-1. **Answer `questions.md` early.** Open questions were the biggest reason the
-   estimate range was wide.
-2. **Ask the module owner what fields today's records hold.** The index can't
+1. **Answer the questions when asked.** They arrive in the terminal, one at a
+   time, in the phase that raised them. Answering them took one run's bad case
+   from 33 days to 21 and its confidence from Medium to High — no analysis in
+   the workflow moved the number that much.
+2. **Expect a second round.** After an answer the workflow re-checks what it
+   broke, and often has one more question. In the run this was built from, that
+   second round removed a feature worth 2.2 days and reversed a recommendation.
+3. **Ask the module owner what fields today's records hold.** The index can't
    see fields, and a new design can drop them without anyone noticing.
-3. **If the design came out of a bigger flow** (like a setup wizard), decide at
+4. **If the design came out of a bigger flow** (like a setup wizard), decide at
    gate 1 whether it replaces today's page.
 4. **No server unit tests in the module?** Budget extra time. The estimate
    doesn't include setting up the first test suite.

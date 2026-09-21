@@ -82,6 +82,7 @@ docs/fe-migration/_index/
   frontend-bindings.json   client file → server schema path → symbols
   endpoints.json           server dir → convention, methods, paths, handlers, tables
   consumers.json           server module group → apps that import it   (L12)
+  table-readers.json       table → server modules that read it        (L12)
   tests.json               unit, integration, e2e specs, page objects
   observability.json       dashboard sources, or NO COVERAGE
   summary.json             counts + acceptance results

@@ -76,15 +76,34 @@ and is actually a decision about which customers can use the screen.
 index. Never load the whole index into one context. This is what keeps fee,
 finance and HRMS from overflowing.
 
-## L12 honesty
+## L12 honesty — ask who touches the table, not who borrows the types
 
-`consumers.json` finds cross-app use **only** where an app imports a server Zod
-schema. `apps/student` imports none. So:
+Two files answer two different questions, and only one of them is enough:
 
-- `none` means **no web consumer**, not **no consumer**
+| File | Answers | Blind to |
+|---|---|---|
+| `_index/consumers.json` | which **app** imports this module's schemas | anything that queries the same table without importing a thing |
+| `_index/table-readers.json` | which **server modules** read each table, directly or through one service hop | raw SQL strings, and any reader outside the server tree |
+
+**Start with `table-readers.json`.** For the module's tables it names every
+reader, and that is the list L12 must account for. The calendar module's events
+table has three: the calendar itself, the Chairman's Cockpit, and the
+student/parent calendar — the last two import no schema and were invisible in
+`consumers.json`.
+
+Rules that follow:
+
+- **`none` must cite something.** A change touching L1, L3 or L4 cannot claim no
+  consumer is affected without naming the readers it checked or saying what was
+  searched. The validator refuses it (rule L), because "no consumers" used to be
+  the cheapest sentence in the document to write and the most expensive to be
+  wrong about.
+- `none` in `consumers.json` means **no web consumer**, not **no consumer**.
+- A hub table with sixty readers is not a finding on its own. Narrow it: which
+  of them read the *field* this change touches? Say what you narrowed by.
 - Two modules sharing a name may share no code. Compare **full module paths** —
   CMS `timetable` and student `timetable` are different server modules, and
-  treating them as one would wrongly apply the ×1.5 breaking-contract multiplier
+  treating them as one would wrongly apply the ×1.5 breaking-contract multiplier.
 
 ## The plain-words verdict — required in `04-impact.md`
 
@@ -119,6 +138,39 @@ before anything can be saved, otherwise every save is refused.
 If a bucket is empty, say so in one line — *"Nothing needs a server change"* is
 the most useful sentence this workflow can produce, and it must be visible
 without reading a table.
+
+### Ask what tracing could not settle
+
+P4 is where the expensive questions appear: a piece of data the ladder followed
+all the way down to "stored nowhere", or an option whose cost depends on an
+answer nobody has given. Each one becomes `impact.LN.blockedOnQuestion`, and a
+blocked item's bad case is **twice** its likely case.
+
+So P4 does not hand the question over as a file. It **asks it in the terminal**,
+one `AskUserQuestion` call per question, biggest-cost question first, with
+"Leave it open" always offered and the person's own answer — the built-in
+"Other" — welcome. The convention is
+`.claude/skills/fem-shared/asking-questions.md`.
+
+```bash
+bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q1 b "<who>"
+```
+
+An answer is not a re-trace. When one arrives, the items that named it go back
+through this phase with the answer in hand — the `blockedOnQuestion` comes off,
+the layers are re-costed — and P5 runs again. The script prints exactly which
+items those are, so none is missed.
+
+Then **re-check what the answer did**, per
+`.claude/skills/fem-shared/answer-consequences.md`: did it kill a cheaper
+option, contradict another answer, break something the other option did not, or
+raise a question nobody has asked? If it did, ask that question too and check
+again. P4 is not done while the loop is still finding things.
+
+`04-impact.md` must then carry a **"What the answers changed"** section — the
+before and after numbers, and each answer that changed the work rather than
+confirming it. An estimate that quietly improves is indistinguishable from one
+that is wrong.
 
 ### The same three buckets go into `questions.md`
 

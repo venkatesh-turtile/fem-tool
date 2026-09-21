@@ -69,6 +69,10 @@ P8  fem-report          REPORT.md + SUMMARY.md (one-page, plain language)
 
 ```bash
 R=.claude/skills/fem-run/scripts/run-state.ts
+A=.claude/skills/fem-run/scripts/record-answer.ts
+bun $A cms timetable Q2 b "you@example.com"      # what someone answered
+bun $A cms timetable Q2 --own "only for exams" "you@example.com"
+bun $A cms timetable Q4 --open "you@example.com" # nobody can answer this yet
 bun $R status  cms timetable
 bun $R next    cms timetable                  # what should run now
 bun $R done    cms timetable P3               # verifies the output file exists
@@ -118,6 +122,21 @@ happens.
    the change catalogue, not a fresh one — decisions survive (NFR-3).
 4. **Never write outside `docs/fe-migration/`** (NFR-1).
 5. **Quote the index ref** with any number you report.
+6. **The phase that raises a question asks it.** Not the next phase, not the
+   gate, not the report — P2 asks the design's questions, P3 the comparison's
+   before gate 1, P4 what tracing turned up, P6 whatever is left. Every kind goes
+   through `AskUserQuestion`: one call per question, options, "Leave it open" or
+   "Skip for now", and the person's own answer always welcome.
+   `.claude/skills/fem-shared/asking-questions.md` is the convention; answers are
+   recorded with `record-answer.ts` and survive a resume.
+7. **Every answer is re-checked before the run moves on.** An answer can kill a
+   cheaper option, contradict another answer, break something the other option
+   did not, or raise a question nobody has asked. See
+   `.claude/skills/fem-shared/answer-consequences.md` — re-check, ask what it
+   turns up, check again, and re-trace plus re-estimate whatever moved. A phase
+   is not done while that loop is still finding things.
+8. **Gate 2 is refused** while a mandatory question is neither answered nor
+   explicitly left open.
 
 ## Time
 

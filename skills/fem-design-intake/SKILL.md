@@ -71,23 +71,56 @@ so each entry is written for them, not for the developer:
    rather than an essay:
 
 ```markdown
-2. An event that covers several classes. Today an event belongs to one class,
-   and the new screen lets one event name several.
-   a) Save it as one event per class and show them as one row — quickest, and
-      nothing changes underneath.
-   b) Build it properly so one event holds many classes — tidier, a few days more.
-   c) Keep one class per event and drop the multi-select from the design.
+### Q2 · An event that covers several classes — **Mandatory**
+
+Today an event belongs to one class, and the new screen lets one event name
+several.
+
+- **a)** Save it as one event per class and show them as one row — quickest, and
+  nothing changes underneath
+- **b)** Build it properly so one event holds many classes — tidier, a few days more
+- **c)** Keep one class per event and drop the multi-select from the design
 ```
 
 4. **No identifiers.** No endpoint paths, table or column names, or file names.
    If the developer needs them, they are in `04-impact.md`.
 5. **One question per decision.** If two things can be answered separately, they
    are two questions.
+6. **Number every question as its own `### Qn ·` heading** and mark it
+   **Mandatory** or **Optional**. An answer is filed under its heading, so a
+   question without one cannot be answered.
 
 Later phases append to this file in the same style. An unanswered question
 doubles the bad-case estimate for every item that depends on it, so a question
 nobody can understand is a question nobody answers — and the estimate stays
 wide for the wrong reason.
+
+## Ask them — do not leave a file and hope
+
+Writing the file is half the job. **Ask every question this phase raised — the
+optional ones too — in the terminal before P2 is recorded**, with `AskUserQuestion`: one call per question, the
+lettered choices as the options, "Leave it open" always available, and the
+person's own answer — the built-in "Other" — treated as the best answer of all.
+
+The convention is `.claude/skills/fem-shared/asking-questions.md`: which
+questions are mandatory, how to phrase the call, what order to ask in, and how
+an answer is recorded. Read it before asking.
+
+Record each answer as it arrives:
+
+```bash
+bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q2 a "<who>"
+bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q2 \
+  --own "one row per class, but only for exams" "<who>"
+```
+
+A resumed run reads `state.json` and asks only what is still open, so nobody is
+asked the same thing twice. Optional questions offer "Skip for now" and the run
+moves on the moment it is chosen.
+
+Then re-check per `.claude/skills/fem-shared/answer-consequences.md` — even at
+P2 an answer can contradict another, and two contradictory answers are a new
+question, not a coin toss.
 
 ## Output
 

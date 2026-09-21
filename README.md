@@ -1,5 +1,19 @@
 # Frontend Migration Impact Workflow
 
+> **Set it up in three commands.** Full explanation below.
+>
+> ```bash
+> git clone https://github.com/venkatesh-turtile/fem-tool.git ~/fem-tool
+> ~/fem-tool/install.sh /path/to/your-repo
+> cd /path/to/your-repo && $EDITOR fem.config.json   # check the top half
+> ```
+>
+> Then, in Claude Code inside your repo:
+>
+> ```
+> /fem-run cms academic-calendar ~/Downloads/Academic_Calendar.html
+> ```
+
 You have a new design for a screen. Before anyone builds it, you want to know:
 **does this need backend work, and what does it cost?**
 
@@ -28,16 +42,55 @@ Database and API changes are the obvious ones. The ones teams miss:
   design and should be priced once, not five times.
 - **Whether the design still fits every customer**, not just the one it was
   drawn for.
+- **Who else reads the same data.** Not "who imports our types" — who touches
+  the table. In the run this was built from, the calendar's events table had
+  three readers: the CMS screen, a dashboard, and the parent app. Two of them
+  import nothing from the CMS and were invisible to the old check. A change
+  that alters an API or a table cannot claim "no one else is affected" without
+  naming what it checked.
 
-## Install
+## Setting it up, step by step
+
+**1 · Clone it somewhere outside the repo you will analyse.** It is its own git
+repository; nesting one inside another only causes confusion later.
 
 ```bash
-git clone <this-repo> fem
-./fem/install.sh /path/to/your-repo
+git clone https://github.com/venkatesh-turtile/fem-tool.git ~/fem-tool
 ```
 
-That copies the skills into `<repo>/.claude/skills/` and leaves a starter
-`fem.config.json` if you do not have one.
+**2 · Install it into your repo.** This copies the fourteen `fem-*` skills into
+`<repo>/.claude/skills/`, and drops in a starter `fem.config.json` if you do not
+already have one. It touches nothing else — no git operations, no dependencies,
+no build.
+
+```bash
+~/fem-tool/install.sh /path/to/your-repo
+```
+
+**3 · Check the config.** `fem.config.json` has two halves. The top says where
+your apps, server, tests and dashboards live — change it for your repo. The
+bottom is the estimating rubric; leave it alone unless you are calibrating.
+
+**4 · Decide whether the tool belongs in your history.** The skills land as
+untracked files, and `.claude/skills/**` is not ignored in every repo. If you do
+not want them committed:
+
+```bash
+cd /path/to/your-repo
+printf '.claude/skills/fem-*\nfem.config.json\n' >> .git/info/exclude
+```
+
+**5 · Run it.** In Claude Code, from inside your repo:
+
+```
+/fem-run <app> <module> ~/Downloads/<design>.html
+```
+
+Nothing else to prepare — no index to build, no folders to create, no design to
+file by hand. The run does all of it.
+
+**Updating later:** `git -C ~/fem-tool pull` then run `install.sh` again. Your
+`fem.config.json` is left as it is.
 
 ## Use
 
@@ -98,7 +151,7 @@ docs/fe-migration/<app>/<module>/
   06-decisions.md   options and costs, for UX
   REPORT.md         evidence for every claim, for engineering
   07-plan.md        build order
-  questions.md      what the workflow could not decide alone
+  questions.md      every question, with the answer you gave and when
   04-impact.md      the twelve-layer trace
   05-estimate.*     the numbers, per change and per layer
 ```
@@ -146,9 +199,24 @@ tomorrow. Change the design and re-run: the file's hash is stored, the phases
 after it are invalidated, and you see a **diff** of the change list rather than
 a fresh one — earlier decisions survive.
 
-Anything the workflow cannot determine becomes a question rather than a guess.
-Unanswered questions widen the estimate, so uncertainty shows up in the number
-instead of hiding in it.
+Anything the workflow cannot determine becomes a question rather than a guess —
+and it **asks you, in the terminal, with options**, in the phase that raised it.
+You pick one, or give your own answer, or say "leave it open". Nothing is left
+in a file for somebody to find later.
+
+Then it re-checks what your answer did. An answer can kill a cheaper option,
+contradict an earlier answer, or raise something nobody asked — so it looks,
+asks again if it finds something, and keeps going until a pass turns up nothing
+new. Whatever moved is re-traced and re-priced, and the report says what changed
+and why.
+
+In the run this was built from, that loop reversed one recommendation and
+removed a feature worth 2.2 days. Answering the questions took the bad case from
+33 days to 21, and the confidence from Medium to High.
+
+A question still unanswered widens the estimate — uncertainty shows up in the
+number instead of hiding in it — and gate 2 is refused while a mandatory one is
+neither answered nor explicitly left open.
 
 ## Docs
 

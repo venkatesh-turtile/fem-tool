@@ -97,7 +97,7 @@ gets the full treatment: shape, then the six rules.
 
 ---
 
-## 5 · The six rules, in plain words
+## 5 · The eleven rules, in plain words
 
 | | In one line | What it stops |
 |---|---|---|
@@ -107,6 +107,36 @@ gets the full treatment: shape, then the six rules.
 | **D** | "We assumed this" with no note of what was searched | A guess dressed as a finding |
 | **E** | A layer is blocked on a question, but the change says it isn't | Blocked work being quietly counted as settled |
 | **F** | **"My cost is covered by C-019" — but C-019 pays nothing** | **Work with no owner. This is the one that failed three times** |
+| **G** | A mandatory question reached gate 2 with nobody having answered it | A decision sheet built on a shrug. Every blocked item is priced at double, and doubled numbers read like estimates |
+| **H** | An item still says it is waiting on a question that has been answered | The answer never reached the trace, so the price still reflects the old uncertainty |
+| **I** | The trace is older than the answers it is supposed to reflect | Answering and then not re-tracing. The number cannot have accounted for something given after it was written |
+| **J** | Answers were recorded, but nothing says what they changed | A number that silently improves is indistinguishable from one that is wrong |
+| **K** | The three plain sentences differ between the three files | A summary promising a free option the impact document already ruled out |
+| **L** | "No one else is affected", with nothing cited | The cheapest sentence in the document to write, and the most expensive to be wrong about. The index now answers it mechanically |
+
+### Rule L — who else reads this
+
+`consumers.json` answers "which app imports this module's types?". A second
+server module can read the same table and import nothing, so that question has
+a blind spot: in the calendar run, the parent app and a dashboard both read the
+events table and neither appeared. Both were found by hand.
+
+`table-readers.json` now answers the other question — table → the server modules
+that read it — and rule L refuses an unevidenced "none" on any change that
+touches the contract, the handler or the schema. Say who you checked, or say
+what you searched.
+
+### Rules G to J — the answer loop
+
+These four came out of one run, in one afternoon, in this order: a gate was
+presented while four questions were unanswered; an answer was given and the item
+stayed marked blocked; the estimate was re-run against a trace that predated the
+answer; and the number improved by four days with nothing in the document saying
+why.
+
+Each was caught by hand, and each is now caught by the validator. Together they
+enforce the loop in `fem-shared/answer-consequences.md`: ask, record, re-check,
+ask again if the check found something, re-trace, re-price, and say what moved.
 
 ### Rule F, with the real example
 

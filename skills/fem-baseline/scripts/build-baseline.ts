@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
  * Reads ONLY docs/fe-migration/_index/*.json — never application source.
  * Spec §8 P1.  bun .../build-baseline.ts <app> <module>
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
@@ -65,6 +65,19 @@ const load = <T>(n: string): T =>
 const pagesDoc = load<{ meta: { ref: Ref }; pages: Page[] }>("pages.json");
 const { bindings } = load<{ bindings: Binding[] }>("frontend-bindings.json");
 const { endpoints } = load<{ endpoints: Endpoint[] }>("endpoints.json");
+// Added after the first indexes were built, so an index from before it is a
+// normal thing to meet. Say what to do rather than dying on a missing file —
+// the orchestrator rebuilds the index every run, so this only bites someone
+// running the phase by hand.
+const tableReaders: Record<string, string[]> = existsSync(
+	join(IDX, "table-readers.json")
+)
+	? load<{ tableReaders: Record<string, string[]> }>("table-readers.json")
+			.tableReaders
+	: (console.warn(
+			"  note: no table-readers.json — rebuild the index to see who else reads these tables"
+		),
+		{});
 const { consumers } = load<{ consumers: Record<string, string[]> }>(
 	"consumers.json"
 );
@@ -140,6 +153,27 @@ for (const d of endpointDirs) {
 	const apps = consumers[key];
 	if (apps?.filter((a: string) => a !== app).length) {
 		consumerHits[key] = apps.filter((a: string) => a !== app);
+	}
+}
+
+// Above this many readers a table is infrastructure, not a dependency worth
+// enumerating: every module touches `institutions`, and saying so each time
+// trains people to skip the section that matters.
+const HUB_READERS = 8;
+
+// ── L12, the other half: who READS the tables this module writes ────────────
+// consumers.json answers "who imports our types". A module that queries the
+// same table and imports nothing is invisible to it — which is how the parent
+// app went unnoticed against the calendar's events table until someone looked
+// by hand. This asks the question that catches it.
+const moduleOf = (p: string) =>
+	p.replace(`${SERVER_MODULES}/`, "").split("/").slice(0, 4).join("/");
+const ownModules = new Set(endpointDirs.map(moduleOf));
+const tableReaderHits: Record<string, string[]> = {};
+for (const t of uniq(resolvedEndpoints.flatMap((e) => e.tables))) {
+	const others = (tableReaders[t] ?? []).filter((m) => !ownModules.has(m));
+	if (others.length > 0) {
+		tableReaderHits[t] = others;
 	}
 }
 
@@ -273,6 +307,22 @@ const md = [
 	`  e2e ui             ${testCounts.e2eUi}`,
 	`  e2e page objects   ${testCounts.e2ePageObjects}`,
 	"```",
+	"",
+	"## L12 — who else reads these tables",
+	"",
+	Object.keys(tableReaderHits).length
+		? `\`\`\`\n${Object.entries(tableReaderHits)
+				.map(([t, m]) =>
+					// A table half the server reads is a hub, and listing sixty
+					// modules buries the one table with three readers that
+					// actually needs checking. Say the number and move on.
+					m.length > HUB_READERS
+						? `  ${t}\n      → a hub table · ${m.length} modules read it · narrow by the field you are changing`
+						: `  ${t}\n      → ${m.join("\n      → ")}`
+				)
+				.join("\n")}\n\`\`\`\n\n` +
+			"> These modules query the same tables. They may import nothing from this\n> module, so they will not appear below — and a column removed here breaks\n> them anyway. Every one must be accounted for at L12."
+		: "```\n  no other server module reads these tables\n```",
 	"",
 	"## L12 — other consumers",
 	"",
