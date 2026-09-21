@@ -312,6 +312,11 @@ Parses the new HTML into the same screen spec, raises **ambiguity questions**
 rather than guessing, and SHA-256s each file into `state.json` so a design update
 re-runs only what it touched.
 
+The questions are not filed away: P2 **asks them in the terminal**, with options,
+before it records itself as done — as does every later phase for its own
+questions. See `fem-shared/asking-questions.md`, and
+`fem-shared/answer-consequences.md` for the re-check that follows every answer.
+
 > ⚠ **This does not work yet.** The designs shipped so far are precompiled React
 > — 1.3 MB with **1,826 `createElement` calls and zero `<table>`, `<th>`,
 > `<input>` or `<button>`**. A DOM parser returns nothing.

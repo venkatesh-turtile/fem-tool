@@ -417,6 +417,79 @@ function buildConsumers(): Record<string, string[]> {
 	);
 }
 
+// ── 4b · TABLE READERS — who TOUCHES each table, not who borrows its types ───
+// The consumer map above answers "which app imports this module's schemas?".
+// That question has a blind spot big enough to break production: a second
+// server module can query the same table directly and import nothing from the
+// first. In this codebase the student/parent calendar and the Chairman's
+// Cockpit both read the academic calendar table that way, and both were
+// invisible here until someone went looking by hand.
+//
+// So this pass asks the other question — for every table, which server module
+// files reach it, directly or through one hop of a shared service. A module
+// proposing to remove a column can then see, mechanically, who else is reading
+// it.
+function buildTableReaders(): Record<string, string[]> {
+	const map: Record<string, Set<string>> = {};
+	const serviceTables = new Map<string, string[]>();
+
+	const tablesIn = (src: string) =>
+		[...src.matchAll(TABLE_RE)].map((m) => m[1] as string);
+
+	// Pass one: every server file, and the tables it imports outright.
+	const files = [...walk(join(ROOT, SERVER_MODULES))].filter((f) =>
+		/\.tsx?$/.test(f)
+	);
+	for (const f of files) {
+		const src = read(f);
+		if (!src) {
+			continue;
+		}
+		const direct = tablesIn(src);
+		if (direct.length > 0) {
+			serviceTables.set(rel(f), direct);
+			for (const t of direct) {
+				(map[t] ??= new Set()).add(moduleKey(rel(f)));
+			}
+		}
+	}
+
+	// Pass two: one hop. A handler that imports a service which imports the
+	// table is a reader of that table, and the handler is what a person
+	// recognises — "the Cockpit", not "queries.ts".
+	for (const f of files) {
+		const src = read(f);
+		if (!src) {
+			continue;
+		}
+		for (const m of src.matchAll(
+			/from\s+["']@server\/modules\/([^"']+)["']/g
+		)) {
+			const target = rel(join(ROOT, SERVER_MODULES, `${m[1]}.ts`));
+			for (const t of serviceTables.get(target) ?? []) {
+				(map[t] ??= new Set()).add(moduleKey(rel(f)));
+			}
+		}
+	}
+
+	return Object.fromEntries(
+		Object.entries(map)
+			.map(([k, v]) => [k, [...v].sort()] as const)
+			.sort(([a], [b]) => a.localeCompare(b))
+	);
+}
+
+// A file path reduced to the thing a human would name: the module it belongs
+// to, four segments deep, which is where module identity lives in this tree.
+function moduleKey(relPath: string): string {
+	const after = relPath.replace(`${SERVER_MODULES}/`, "");
+	// Drop the filename first: "admin/users/purge-identity.handlers.ts" is the
+	// admin/users module, not a module of its own. Without this a hub table
+	// lists the same module once per file in it.
+	const dir = after.split("/").slice(0, -1);
+	return dir.slice(0, 4).join("/");
+}
+
 // ── 5 · TESTS ────────────────────────────────────────────────────────────────
 function buildTests() {
 	const g = (dir: string, re: RegExp) =>
@@ -467,6 +540,7 @@ const pages = buildPages();
 const bindings = buildBindings();
 const endpoints = buildEndpoints(bindings);
 const consumers = buildConsumers();
+const tableReaders = buildTableReaders();
 const tests = buildTests();
 const observability = buildObservability();
 
@@ -497,6 +571,8 @@ const summary = {
 	tables: uniq(endpoints.flatMap((e) => e.tables)).length,
 	sharedServerModules: Object.entries(consumers).filter(([, a]) => a.length > 1)
 		.length,
+	sharedTables: Object.entries(tableReaders).filter(([, r]) => r.length > 1)
+		.length,
 	accept: {
 		resolutionRate: {
 			need: CFG.acceptance.index_binding_resolution_rate,
@@ -525,6 +601,7 @@ write("pages.json", { pages });
 write("frontend-bindings.json", { bindings });
 write("endpoints.json", { endpoints });
 write("consumers.json", { consumers });
+write("table-readers.json", { tableReaders });
 write("tests.json", { tests });
 write("observability.json", { observability });
 write("summary.json", { summary });
@@ -534,6 +611,9 @@ console.log(
 );
 console.log(
 	`  pages ${pages.length} · bindings ${bindings.length} · endpoints ${realEndpoints.length} (${(rate * 100).toFixed(1)}% resolved) · routes ${summary.routeDefinitions} · shared-schema dirs ${sharedSchema.length}`
+);
+console.log(
+	`  tables ${Object.keys(tableReaders).length} · read by more than one module ${summary.sharedTables}`
 );
 const timePass = elapsed <= CFG.acceptance.index_max_seconds;
 console.log(

@@ -63,6 +63,29 @@ nothing was invented. The taxonomy tags below the list are for the phases that
 follow, and a developer should check those; the plain list is what makes the
 gate answerable by anyone.
 
+## Ask what the comparison raised — before gate 1
+
+P3 is the first phase that can see old and new together, so it is the first that
+can ask a question worth asking: does this design still fit a college, is a
+capability actually removed or only moved, is a screen a replacement or a split.
+
+**Ask them here, not at P4.** A question asked one phase late has already been
+traced and priced as a guess. One `AskUserQuestion` call per question, options
+plus "Leave it open", the person's own answer welcome — the convention is
+`.claude/skills/fem-shared/asking-questions.md`.
+
+The college question in particular is asked, not merely written down: it decides
+which customers can use the screen, and nobody reads that decision out of a
+prose paragraph in time to change it.
+
+```bash
+bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q1 a "<who>"
+```
+
+Then re-check per `.claude/skills/fem-shared/answer-consequences.md`: an answer
+here can change the change catalogue itself — a capability confirmed as "kept"
+stops being an R1, a design confirmed school-only becomes its own item.
+
 ## Gate 1
 
 Present to the developer:

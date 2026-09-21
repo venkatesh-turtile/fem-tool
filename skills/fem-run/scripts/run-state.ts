@@ -55,6 +55,7 @@ type State = {
 	module: string;
 	phases: Record<string, string>;
 	gates: Record<string, { approvedBy: string } | null>;
+	phaseTimes?: Record<string, string>;
 	designHashes: Record<string, string>;
 };
 const blank: State = {
@@ -157,6 +158,11 @@ switch (cmd) {
 			console.log(checkOut);
 		}
 		state.phases[p.id] = p.out;
+		// When, not only whether. An answer given after P4 was recorded means
+		// the trace cannot reflect it, and a file's mtime cannot be trusted to
+		// say so — it is reset by a copy, a checkout or a branch switch.
+		state.phaseTimes ??= {};
+		state.phaseTimes[p.id] = new Date().toISOString();
 		if (p.id === "P2") {
 			state.designHashes = hashDesigns();
 		}
