@@ -1,0 +1,410 @@
+#!/usr/bin/env bun
+/**
+ * fem-run — output validator. Checks a module's phase outputs against the
+ * schemas in fem-shared/schemas, plus the fem rules no schema can express.
+ *
+ * It exists because two real errors got through three runs unnoticed: a
+ * compatibility check and an integration test each vanished when gate 2
+ * approved a cheaper variant, and the layer that claimed to be "covered by"
+ * them still pointed at an owner that no longer priced anything. Rule F below
+ * is that check.
+ *
+ *   validate-outputs.ts <app> <module> [P1|P2|P4|P5]
+ * exit 0 clean (warnings allowed) · 1 violations · 2 usage
+ */
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const ROOT = process.cwd();
+const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
+const SCHEMA_DIR = join(import.meta.dir, "..", "..", "fem-shared", "schemas");
+const [app, moduleName, onlyPhase] = process.argv.slice(2);
+if (!(app && moduleName)) {
+	console.error("usage: validate-outputs.ts <app> <module> [P1|P2|P4|P5]");
+	process.exit(2);
+}
+const dir = join(ROOT, CFG.paths.output, app, moduleName);
+
+const errors: string[] = [];
+const warnings: string[] = [];
+const err = (m: string) => errors.push(m);
+const warn = (m: string) => warnings.push(m);
+
+// ── the subset of JSON Schema these documents actually use ───────────────────
+type Schema = Record<string, unknown>;
+const schemaCache = new Map<string, Schema>();
+function loadSchema(file: string): Schema {
+	const hit = schemaCache.get(file);
+	if (hit) {
+		return hit;
+	}
+	const s = JSON.parse(readFileSync(join(SCHEMA_DIR, file), "utf8"));
+	schemaCache.set(file, s);
+	return s;
+}
+
+function typeOf(v: unknown): string {
+	if (v === null) {
+		return "null";
+	}
+	return Array.isArray(v) ? "array" : typeof v;
+}
+
+function validate(value: unknown, schema: Schema, path: string): void {
+	if (typeof schema.$ref === "string") {
+		validate(value, loadSchema(schema.$ref), path);
+		return;
+	}
+	if (schema.enum && !(schema.enum as unknown[]).includes(value as never)) {
+		err(
+			`${path}: ${JSON.stringify(value)} is not one of ${JSON.stringify(schema.enum)}`
+		);
+		return;
+	}
+	if (schema.type) {
+		const want = Array.isArray(schema.type) ? schema.type : [schema.type];
+		const got = typeOf(value);
+		const integerOk =
+			want.includes("integer") && got === "number" && Number.isInteger(value);
+		if (!(want.includes(got) || integerOk)) {
+			err(`${path}: expected ${want.join("|")}, got ${got}`);
+			return;
+		}
+	}
+	if (typeof value === "string") {
+		if (
+			typeof schema.pattern === "string" &&
+			!new RegExp(schema.pattern).test(value)
+		) {
+			err(`${path}: "${value}" does not match ${schema.pattern}`);
+		}
+		if (
+			typeof schema.minLength === "number" &&
+			value.length < schema.minLength
+		) {
+			err(`${path}: shorter than minLength ${schema.minLength}`);
+		}
+	}
+	if (Array.isArray(value) && schema.items) {
+		value.forEach((v, i) => {
+			validate(v, schema.items as Schema, `${path}[${i}]`);
+		});
+	}
+	if (typeOf(value) === "object") {
+		const obj = value as Record<string, unknown>;
+		for (const key of (schema.required as string[]) ?? []) {
+			if (!(key in obj)) {
+				err(`${path}: missing required "${key}"`);
+			}
+		}
+		const props = (schema.properties as Record<string, Schema>) ?? {};
+		const patterns = Object.entries(
+			(schema.patternProperties as Record<string, Schema>) ?? {}
+		);
+		for (const [key, v] of Object.entries(obj)) {
+			if (props[key]) {
+				validate(v, props[key], `${path}.${key}`);
+				continue;
+			}
+			const hit = patterns.find(([re]) => new RegExp(re).test(key));
+			if (hit) {
+				validate(v, hit[1], `${path}.${key}`);
+				continue;
+			}
+			if (schema.additionalProperties === false) {
+				err(`${path}: unexpected property "${key}" (schema forbids it)`);
+			}
+		}
+	}
+}
+
+const read = (file: string) =>
+	JSON.parse(readFileSync(join(dir, file), "utf8"));
+const want = (phase: string) => !onlyPhase || onlyPhase === phase;
+const LAYERS = Array.from({ length: 12 }, (_, i) => `L${i + 1}`);
+
+// ── P1 · baseline ────────────────────────────────────────────────────────────
+if (want("P1") && existsSync(join(dir, "01-baseline.json"))) {
+	validate(
+		read("01-baseline.json").spec,
+		loadSchema("screen-spec.schema.json"),
+		"01-baseline.spec"
+	);
+}
+
+// ── P2 · design intake ───────────────────────────────────────────────────────
+if (want("P2") && existsSync(join(dir, "02-new-design.json"))) {
+	const doc = read("02-new-design.json");
+	validate(doc, loadSchema("screen-spec.schema.json"), "02-new-design");
+	for (const s of doc.screens ?? []) {
+		if (s.parseable === false) {
+			err(
+				`02-new-design: screen "${s.file}" is UNPARSEABLE — P3 must not run on it (rule 2)`
+			);
+		}
+	}
+}
+
+// ── P4 · impact ──────────────────────────────────────────────────────────────
+if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
+	const doc = read("04-impact.json");
+	validate(doc, loadSchema("impact.schema.json"), "04-impact");
+	const changes: Record<string, never>[] = doc.changes ?? [];
+	const byId = new Map(
+		changes.map((c: Record<string, never>) => [c.id as string, c])
+	);
+
+	// A · P3 catalogued more than P4 traced
+	if (
+		typeof doc.catalogueSize === "number" &&
+		changes.length < doc.catalogueSize
+	) {
+		err(
+			`04-impact: P3 catalogued ${doc.catalogueSize} changes, P4 traced ${changes.length}`
+		);
+	}
+	for (const c of changes) {
+		const id = c.id as string;
+		const impact = c.impact as Record<string, Record<string, unknown>>;
+		// B · V0/V1 still cost L10 (§6.1) — caught here, not only in the estimate
+		const kind = c.type as string;
+		if (
+			(kind === "V0" || kind === "V1") &&
+			String(impact.L10?.change ?? "none").startsWith("none")
+		) {
+			err(
+				`${id}: ${kind} carries no L10 — visual-only changes still need an e2e spec (§6.1)`
+			);
+		}
+		// C · a rubric key must exist in fem.config.json for that layer
+		for (const L of LAYERS) {
+			for (const key of (impact[L]?.rubric as string[]) ?? []) {
+				if (!(key in (CFG.baseSizes[L] ?? {}))) {
+					err(
+						`${id} ${L}: rubric key "${key}" is not in fem.config.json baseSizes.${L}`
+					);
+				}
+			}
+		}
+		// D · §6.4 — an Assumed claim must say what was searched
+		for (const L of LAYERS) {
+			if (impact[L]?.assumed === true && !impact[L]?.searched) {
+				err(`${id} ${L}: assumed=true without "searched" (§6.4)`);
+			}
+		}
+		// E · status must reflect the layers
+		const blocked = LAYERS.some((L) => impact[L]?.blockedOnQuestion);
+		const assumed = LAYERS.some((L) => impact[L]?.assumed === true);
+		const status = c.status as string;
+		if (blocked && status !== "blocked-on-question") {
+			err(`${id}: a layer is blocked on a question but status is "${status}"`);
+		}
+		if (!blocked && assumed && status !== "assumed") {
+			warn(`${id}: has assumed layers but status is "${status}"`);
+		}
+		// F · fold integrity — the check that would have caught both real errors
+		for (const L of LAYERS) {
+			const text = String(impact[L]?.change ?? "");
+			// A layer that is itself "none" defers no cost — a mention of another
+			// change there is a cross-reference, not a fold.
+			if (text.trim().toLowerCase().startsWith("none")) {
+				continue;
+			}
+			for (const m of text.matchAll(
+				/(?:covered by|priced in)\s+(C-[a-z0-9-]+-\d{3})/gi
+			)) {
+				const ownerId = m[1];
+				if (ownerId === id) {
+					continue;
+				}
+				const owner = byId.get(ownerId) as Record<string, never> | undefined;
+				if (!owner) {
+					err(
+						`${id} ${L}: folds into ${ownerId}, which is not in this catalogue`
+					);
+					continue;
+				}
+				const ownerLayer = (
+					owner.impact as Record<string, Record<string, unknown>>
+				)[L];
+				const ownerText = String(ownerLayer?.change ?? "");
+				const ownerRubric = (ownerLayer?.rubric as string[]) ?? [];
+				if (ownerText.trim().toLowerCase().startsWith("none")) {
+					err(
+						`${id} ${L}: says the cost is covered by ${ownerId} ${L}, but ${ownerId} ${L} is "none" — the cost was dropped`
+					);
+				} else if (ownerRubric.length === 0) {
+					warn(
+						`${id} ${L}: folds into ${ownerId} ${L}, which prices nothing (fine for a deletion, wrong otherwise)`
+					);
+				}
+			}
+		}
+	}
+}
+
+// ── P8 · the two documents, in the shape every module must share ────────────
+// A reader should find the same thing in the same place in every summary, so
+// the ten sections are fixed and ordered. The college question is one of them:
+// every design so far assumed a school, while the product serves programme-
+// shaped institutions through templates, public/programmes and the university
+// exam reports.
+const SUMMARY_SECTIONS = [
+	// Who the design is for comes before what it costs: a reader deciding for a
+	// college needs to know it does not serve them before they read a day count.
+	"## Does this affect colleges?",
+	"## The verdict",
+	"## The choice",
+	"## Recommendation",
+	"## What changes, in numbers",
+	"## What users gain",
+	"## What users lose",
+	"## What makes it expensive",
+	"## How sure we are",
+	"## Exactly what changes",
+];
+if (want("P8")) {
+	const reportAt = join(dir, "REPORT.md");
+	if (
+		existsSync(reportAt) &&
+		!readFileSync(reportAt, "utf8").includes("Institution shape")
+	) {
+		err(
+			'REPORT.md: missing the "Institution shape" section — say whether the design works for a college, even if the answer is "no assumption"'
+		);
+	}
+	const impactMd = join(dir, "04-impact.md");
+	if (
+		existsSync(impactMd) &&
+		!readFileSync(impactMd, "utf8").includes("in plain words")
+	) {
+		err(
+			'04-impact.md: missing the "What this needs from the server, in plain words" section — three buckets, in sentences, no identifiers'
+		);
+	}
+	// questions.md is the file the reader has to answer, so it is held to the
+	// same plain-words rule as the summary.
+	const questionsAt = join(dir, "questions.md");
+	if (existsSync(questionsAt)) {
+		const asked = readFileSync(questionsAt, "utf8");
+		// Once impact is traced, the reader must meet the verdict where they are
+		// already answering — not only in an engineering document.
+		if (
+			existsSync(impactMd) &&
+			!asked.includes("What this needs from the server")
+		) {
+			err(
+				'questions.md: missing the "What this needs from the server" block — P4 puts the same three plain sentences at the top of this file, above the questions'
+			);
+		}
+		for (const [pattern, what] of [
+			[/\b(GET|POST|PUT|PATCH|DELETE)\s+\/[\w{}/:-]+/, "an endpoint path"],
+			[/\b\w+\.(ts|tsx)\b/, "a source file name"],
+			[/\b[a-z][a-z0-9]*_[a-z0-9_]+\b/, "a table or column name"],
+		] as Array<[RegExp, string]>) {
+			const hit = asked.match(pattern);
+			if (hit) {
+				err(
+					`questions.md: ${what} ("${hit[0]}") — the person answering may not be an engineer. Ask it in terms of what the screen does`
+				);
+			}
+		}
+	}
+	const summaryAt = join(dir, "SUMMARY.md");
+	if (existsSync(summaryAt)) {
+		const text = readFileSync(summaryAt, "utf8");
+		// New endpoints, tables and columns are the first thing a tech lead looks
+		// for, so the block sits ABOVE the fold — before the verdict, not buried
+		// in the middle of the page.
+		const highlight = text.indexOf("API and database changes");
+		if (highlight === -1) {
+			err(
+				'SUMMARY.md: missing the "API and database changes" block — say what new endpoints, tables, columns and indexes the module needs, or that there are none'
+			);
+		} else {
+			const first = text.indexOf("\n## Does this affect colleges?");
+			if (first !== -1 && highlight > first) {
+				err(
+					'SUMMARY.md: the "API and database changes" block must come FIRST, above "Does this affect colleges?" — it is the answer a tech lead scans for'
+				);
+			}
+		}
+		// Every API and database row says why it is needed, not only what it is.
+		for (const heading of ["### 1 · API changes", "### 2 · Database changes"]) {
+			const at = text.indexOf(heading);
+			if (at === -1) {
+				continue;
+			}
+			const header = text
+				.slice(at, at + 400)
+				.split("\n")
+				.find((l) => l.startsWith("|"));
+			if (header && !header.includes("Why")) {
+				err(`SUMMARY.md: "${heading}" table has no "Why" column`);
+			}
+		}
+		// The person reading this may not be an engineer. Page one is about
+		// consequences; identifiers belong in REPORT.md. The three plain buckets
+		// fem-impact wrote must survive the trip into the summary.
+		const plainBuckets = [
+			"Needs a server change",
+			"Not in the CMS today",
+			"Extra we must handle",
+		];
+		if (!plainBuckets.some((bucket) => text.includes(bucket))) {
+			err(
+				'SUMMARY.md: none of the plain-words buckets appear — carry "Needs a server change", "Not in the CMS today" and "Extra we must handle" over from 04-impact.md, or say in one line that a bucket is empty'
+			);
+		}
+		const jargon: Array<[RegExp, string]> = [
+			[/\b(GET|POST|PUT|PATCH|DELETE)\s+\/[\w{}/:-]+/g, "an endpoint path"],
+			[/\b\w+\.(ts|tsx)\b/g, "a source file name"],
+			[/\b[a-z][a-z0-9]*_[a-z0-9_]+\b/g, "a table or column name"],
+		];
+		const half = text.slice(0, Math.max(0, text.indexOf("## Exactly what changes")));
+		for (const [pattern, what] of jargon) {
+			const hit = half.match(pattern);
+			if (hit) {
+				err(
+					`SUMMARY.md: ${what} ("${hit[0]}") appears before "Exactly what changes". Say it in plain words there and keep the identifier in REPORT.md`
+				);
+			}
+		}
+
+		let cursor = -1;
+		for (const heading of SUMMARY_SECTIONS) {
+			const at = text.indexOf(`\n${heading}`);
+			if (at === -1) {
+				err(`SUMMARY.md: missing the section "${heading}"`);
+				continue;
+			}
+			if (at < cursor) {
+				err(
+					`SUMMARY.md: "${heading}" is out of order — the ten sections are fixed`
+				);
+			}
+			cursor = at;
+		}
+	}
+}
+
+// ── P5 · estimate ────────────────────────────────────────────────────────────
+if (want("P5") && existsSync(join(dir, "05-estimate.json"))) {
+	validate(
+		read("05-estimate.json"),
+		loadSchema("estimate.schema.json"),
+		"05-estimate"
+	);
+}
+
+const where = `${app}/${moduleName}${onlyPhase ? ` ${onlyPhase}` : ""}`;
+for (const w of warnings) {
+	console.log(`  warn  ${w}`);
+}
+for (const e of errors) {
+	console.error(`  FAIL  ${e}`);
+}
+console.log(
+	`fem-validate · ${where} · ${errors.length} error(s) · ${warnings.length} warning(s)`
+);
+process.exit(errors.length ? 1 : 0);

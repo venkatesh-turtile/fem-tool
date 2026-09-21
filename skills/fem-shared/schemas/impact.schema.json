@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "fem impact document (04-impact.json)",
+  "type": "object",
+  "required": ["app", "module", "ref", "catalogueSize", "changes"],
+  "properties": {
+    "app": {
+      "enum": ["cms", "student-cms", "admin"]
+    },
+    "module": {
+      "type": "string"
+    },
+    "ref": {
+      "type": "object",
+      "$comment": "the index ref this was traced against"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "change-item.schema.json"
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "$comment": "\u00a78 P4 acceptance: 100% of non-V0 changes have an entry for every layer",
+      "required": ["nonV0Changes", "fullyCovered"],
+      "properties": {
+        "nonV0Changes": {
+          "type": "integer"
+        },
+        "fullyCovered": {
+          "type": "integer"
+        },
+        "pass": {
+          "type": "boolean"
+        }
+      }
+    },
+    "catalogueSize": {
+      "type": "integer",
+      "$comment": "how many changes P3 catalogued. compute-estimate.ts refuses to run without it, so a dropped change cannot pass unnoticed."
+    }
+  }
+}

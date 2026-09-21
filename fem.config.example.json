@@ -1,0 +1,248 @@
+{
+	"$comment": "Frontend Migration Impact Workflow \u2014 settings for the repo this is installed in. The top half says where things are and is what you change for your codebase; the bottom half is the estimating rubric and should only change through fem-calibrate.",
+	"version": 1,
+	"paths": {
+		"designs": "docs/fe-migration/designs",
+		"output": "docs/fe-migration",
+		"index": "docs/fe-migration/_index",
+		"shared": "docs/fe-migration/_shared",
+		"rollup": "docs/fe-migration/_rollup"
+	},
+	"apps": {
+		"cms": {
+			"root": "apps/cms",
+			"routeBase": "apps/cms/app",
+			"modules": "apps/cms/modules"
+		},
+		"student-cms": {
+			"root": "apps/student-cms",
+			"routeBase": "apps/student-cms/app",
+			"modules": "apps/student-cms/modules"
+		},
+		"admin": {
+			"root": "apps/admin",
+			"routeBase": "apps/admin/app",
+			"modules": "apps/admin/modules"
+		}
+	},
+	"server": {
+		"root": "apps/server/src",
+		"alias": "@server/",
+		"modules": "apps/server/src/modules",
+		"schema": "apps/server/src/database/schema",
+		"integration": "apps/server/src/__integration__",
+		"conventions": [
+			{
+				"name": "feature-folder",
+				"schema": "schema.ts",
+				"route": "route.ts",
+				"handler": "handler.ts"
+			},
+			{
+				"name": "suffixed",
+				"schema": "*.schema.ts",
+				"route": "*.routes.ts",
+				"handler": "*.handlers.ts"
+			}
+		]
+	},
+	"e2e": {
+		"root": "apps/e2e",
+		"apiSpecs": "apps/e2e/tests/api",
+		"uiSpecs": "apps/e2e/tests/ui",
+		"pageObjects": "apps/e2e/pages"
+	},
+	"observability": {
+		"dashboards": "apps/monitoring",
+		"alerts": "apps/monitoring"
+	},
+	"consumerApps": [
+		"cms",
+		"student-cms",
+		"admin",
+		"student",
+		"driver",
+		"job-server",
+		"admissions-portal",
+		"salesperson-portal",
+		"student-portal"
+	],
+	"$comment_estimation": "\u00a79.1 base sizes, person-days at P50",
+	"baseSizes": {
+		"L1": {
+			"additive_response_field": 0.25,
+			"new_read_endpoint_paginated": 1.0,
+			"new_mutation_endpoint": 1.5,
+			"breaking_change_as_new_version": 1.0
+		},
+		"L2": {
+			"new_permission_scope": 0.5
+		},
+		"L3": {
+			"simple_rule_or_aggregation": 0.5,
+			"complex_logic_or_state_machine": [
+				2,
+				4
+			]
+		},
+		"L4": {
+			"additive_column": 0.25,
+			"new_table_with_relations": 1.0,
+			"new_index": 0.25
+		},
+		"L5": {
+			"backfill_small_table": 0.5,
+			"backfill_or_index_large_hot_table": 2.0
+		},
+		"L6": {
+			"new_async_job_export_notification": [
+				1.5,
+				2
+			]
+		},
+		"L7": {
+			"$type": "percentage",
+			"of": [
+				"L1",
+				"L2",
+				"L3",
+				"L4",
+				"L5",
+				"L6"
+			],
+			"rate": 0.3
+		},
+		"L8": {
+			"integration_tests_per_endpoint": 0.5
+		},
+		"L9": {
+			"e2e_api_spec": 0.5
+		},
+		"L10": {
+			"e2e_ui_spec_and_page_object_per_screen": [
+				0.5,
+				1
+			]
+		},
+		"L11": {
+			"dashboard_panel_or_alert_rule": [
+				0.25,
+				0.5
+			]
+		},
+		"L12": {
+			"consumer_compatibility_check_per_consumer": 0.5
+		}
+	},
+	"$comment_order": "L7 is a PERCENTAGE of L1-L6. Order of operations is fixed here so two runs cannot disagree \u2014 see NFR-6.",
+	"orderOfOperations": [
+		"1. sum base sizes L1-L6",
+		"2. apply \u00a79.2 risk multipliers to that sum",
+		"3. compute L7 as 30% of the multiplied L1-L6 sum",
+		"4. add L8-L12 base sizes, unmultiplied",
+		"5. module subtotal",
+		"6. add \u00a79.3 module overhead +15%",
+		"7. P90 = P50 x evidence-state multiplier"
+	],
+	"$comment_risk": "\u00a79.2 \u2014 multiplicative, applied to the L1-L6 sum",
+	"riskMultipliers": {
+		"breaking_contract_with_other_consumer": 1.5,
+		"data_migration_large_or_hot_table": 1.5,
+		"payments_finance_fee_domain": 1.3,
+		"state_machine_change_A2": 1.3
+	},
+	"riskMultiplierCap": 3.0,
+	"$comment_cap": "NOT in the doc. Without a cap the four multipliers stack to x3.80 and P90 reaches x6.08. Flagged as a review question; set to 3.0 pending the author's decision.",
+	"$comment_evidence": "\u00a79.3 \u2014 P90 = P50 x this",
+	"evidenceState": {
+		"all_evidenced": 1.3,
+		"any_assumed": 1.6,
+		"ambiguity_question_unanswered": 2.0
+	},
+	"moduleOverhead": 0.15,
+	"confidence": {
+		"$comment": "\u00a79.3 \u2014 share of change items marked Assumed",
+		"high": 0.0,
+		"medium": 0.2,
+		"low_above": 0.2
+	},
+	"$comment_taxonomy": "\u00a76.1 \u2014 V0/V1 skip backend tracing but still cost L10",
+	"taxonomy": {
+		"V0": {
+			"name": "Visual-only",
+			"skipsBackendTrace": true,
+			"stillCosts": [
+				"L10"
+			]
+		},
+		"V1": {
+			"name": "Relocation",
+			"skipsBackendTrace": true,
+			"stillCosts": [
+				"L10"
+			]
+		},
+		"D1": {
+			"name": "Data display",
+			"usesResolutionLadder": true
+		},
+		"D2": {
+			"name": "Query capability",
+			"usesResolutionLadder": true
+		},
+		"A1": {
+			"name": "New action"
+		},
+		"A2": {
+			"name": "Workflow / state",
+			"riskMultiplier": "state_machine_change_A2"
+		},
+		"R1": {
+			"name": "Removal",
+			"neverRemoveUntilConsumersChecked": true
+		},
+		"X": {
+			"name": "Cross-cutting",
+			"estimatedAtProgrammeLevel": true
+		}
+	},
+	"$comment_ladder": "\u00a76.2 \u2014 stop at the first hit",
+	"resolutionLadder": [
+		{
+			"step": 1,
+			"test": "in the current response schema",
+			"cost": "0 \u2014 FE only"
+		},
+		{
+			"step": 2,
+			"test": "derivable client-side from returned fields",
+			"cost": "0 \u2014 flag perf"
+		},
+		{
+			"step": 3,
+			"test": "in the DB but not exposed",
+			"cost": "additive API \u2014 low"
+		},
+		{
+			"step": 4,
+			"test": "derivable server-side (join, aggregate)",
+			"cost": "handler + index \u2014 medium"
+		},
+		{
+			"step": 5,
+			"test": "not stored anywhere",
+			"cost": "DB + write path + backfill \u2014 high"
+		}
+	],
+	"$comment_accept": "\u00a78 and \u00a712 acceptance thresholds, machine-checkable",
+	"acceptance": {
+		"index_binding_resolution_rate": 0.95,
+		"index_max_seconds": 120,
+		"baseline_screen_match": 1.0,
+		"screen_map_classified": 0.95,
+		"screen_map_accepted_without_edits": 0.9,
+		"impact_layer_coverage": 1.0,
+		"estimate_within_of_tech_lead": 0.25,
+		"module_max_hours": 2
+	}
+}

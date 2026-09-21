@@ -1,0 +1,309 @@
+#!/usr/bin/env bun
+import { createHash } from "node:crypto";
+/**
+ * fem-baseline — P1. Describes a module as it exists today, in the screen spec
+ * that fem-design-intake also emits, so P3 can diff them directly.
+ *
+ * Reads ONLY docs/fe-migration/_index/*.json — never application source.
+ * Spec §8 P1.  bun .../build-baseline.ts <app> <module>
+ */
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const ROOT = process.cwd();
+const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
+// Where the server lives, so a module path can be shown without its prefix.
+const SERVER_MODULES: string = `${CFG.server.modules}/`;
+const [app, moduleName] = process.argv.slice(2);
+if (!(app && moduleName)) {
+	console.error("usage: build-baseline.ts <app> <module>");
+	process.exit(2);
+}
+
+// ── shapes of the _index/*.json documents this reads ────────────────────────
+type Ref = { branch: string; sha: string; dirty: boolean };
+type Page = {
+	id: string;
+	app: string;
+	route: string;
+	file: string;
+	module: string | null;
+};
+type Binding = {
+	app: string;
+	module: string;
+	clientFile: string;
+	serverPath: string;
+	symbols: string[];
+};
+type Endpoint = {
+	id: string;
+	serverPath: string;
+	convention: string;
+	methods: string[];
+	paths: string[];
+	routeCount: number;
+	routeStyles: string[];
+	routeFile: string | null;
+	handlerFiles: string[];
+	serviceFiles: string[];
+	tables: string[];
+	tablesVia: string;
+};
+type Tests = {
+	serverUnit: string[];
+	serverIntegration: string[];
+	frontendUnit: Record<string, string[]>;
+	e2eApi: string[];
+	e2eUi: string[];
+	e2ePageObjects: string[];
+};
+
+const IDX = join(ROOT, CFG.paths.index);
+const load = <T>(n: string): T =>
+	JSON.parse(readFileSync(join(IDX, n), "utf8")) as T;
+const pagesDoc = load<{ meta: { ref: Ref }; pages: Page[] }>("pages.json");
+const { bindings } = load<{ bindings: Binding[] }>("frontend-bindings.json");
+const { endpoints } = load<{ endpoints: Endpoint[] }>("endpoints.json");
+const { consumers } = load<{ consumers: Record<string, string[]> }>(
+	"consumers.json"
+);
+const tests = load<{ tests: Tests }>("tests.json").tests;
+const meta = pagesDoc.meta;
+
+const epByPath = new Map<string, Endpoint>(
+	endpoints.map((e) => [e.serverPath, e])
+);
+const uniq = <T>(a: T[]) => [...new Set(a)].sort();
+
+// NFR-3: derive the id from the route, not from sort position. Removing a
+// screen must not renumber the others — gate 2 decisions reference these ids.
+const shortId = (v: string) =>
+	createHash("sha256").update(v).digest("hex").slice(0, 6);
+
+// ── screens: route-prefix scoped, NEVER substring ────────────────────────────
+// '*timetable*' matches 8 CMS pages across four modules. Scoped to the
+// /<module> route prefix it is 2.
+// pages.json already records `module` as the first NON-DYNAMIC route segment,
+// so routes carrying [institutionId] resolve correctly and
+// /hrms/admin/timetable stays with hrms, not timetable.
+const screens = pagesDoc.pages
+	.filter((p) => p.app === app && p.module === moduleName)
+	.sort((a, b) => a.route.localeCompare(b.route));
+const segAfter = (route: string) => {
+	const seg = route.split("/").filter(Boolean);
+	const i = seg.indexOf(moduleName);
+	return i >= 0 ? seg.slice(i + 1).join("/") : "";
+};
+
+// ── bindings for this module ─────────────────────────────────────────────────
+const mine = bindings.filter((b) => b.app === app && b.module === moduleName);
+const dirOf = (serverPath: string) => serverPath.replace(/\/[^/]*$/, "");
+const endpointDirs = uniq(mine.map((b) => dirOf(b.serverPath)));
+
+const resolvedEndpoints = endpointDirs
+	.map((d) => epByPath.get(d))
+	.filter((e): e is Endpoint => !!e && e.methods.length > 0);
+
+// A `common/` or `shared/` dir holding only schemas.ts + utils.ts is shared
+// types, not a failed endpoint. The index marks those `shared-schema`; they
+// must not count against the resolution rate.
+const sharedSchemaDirs = endpointDirs.filter(
+	(d) => epByPath.get(d)?.convention === "shared-schema"
+);
+const stubDirs = endpointDirs.filter(
+	(d) => epByPath.get(d)?.convention === "no-routes-defined"
+);
+const unresolved = endpointDirs.filter((d) => {
+	const e = epByPath.get(d);
+	if (
+		e?.convention === "shared-schema" ||
+		e?.convention === "no-routes-defined"
+	) {
+		return false;
+	}
+	return !e || e.methods.length === 0;
+});
+const realDirs = endpointDirs.filter((d) => {
+	const c = epByPath.get(d)?.convention;
+	return c !== "shared-schema" && c !== "no-routes-defined";
+});
+
+// ── L12: who else consumes the server modules this module uses ───────────────
+const consumerHits: Record<string, string[]> = {};
+for (const d of endpointDirs) {
+	const key = d
+		.replace(SERVER_MODULES, "")
+		.split("/")
+		.slice(0, 4)
+		.join("/");
+	const apps = consumers[key];
+	if (apps?.filter((a: string) => a !== app).length) {
+		consumerHits[key] = apps.filter((a: string) => a !== app);
+	}
+}
+
+// ── tests scoped to the module ───────────────────────────────────────────────
+const hit = (arr: string[]) =>
+	arr.filter((f) => f.toLowerCase().includes(moduleName.toLowerCase()));
+const testCounts = {
+	serverUnit: hit(tests.serverUnit).length,
+	serverIntegration: hit(tests.serverIntegration).length,
+	frontendUnit: hit(tests.frontendUnit?.[app] ?? []).length,
+	e2eApi: hit(tests.e2eApi).length,
+	e2eUi: hit(tests.e2eUi).length,
+	e2ePageObjects: hit(tests.e2ePageObjects).length,
+};
+
+// ── emit the screen spec ─────────────────────────────────────────────────────
+const spec = {
+	app,
+	module: moduleName,
+	source: "repository",
+	ref: meta.ref,
+	screens: screens.map((p: Page, i: number) => ({
+		id: `S-${moduleName}-${shortId(p.route)}`,
+		name: segAfter(p.route) || moduleName,
+		route: p.route,
+		file: p.file,
+		state: "default",
+		// Elements are populated by the model step — the script establishes the
+		// frame and the bindings; §8 P1 requires every element to carry a binding
+		// or be marked static.
+		elements: [] as unknown[],
+	})),
+};
+
+const facts = {
+	app,
+	module: moduleName,
+	ref: meta.ref,
+	screens: screens.length,
+	bindings: mine.length,
+	bindingFiles: uniq(mine.map((b) => b.clientFile)).length,
+	endpoints: {
+		total: realDirs.length,
+		resolved: resolvedEndpoints.length,
+		sharedSchemaDirs: sharedSchemaDirs.length,
+		stubDirs,
+		resolutionRate: realDirs.length
+			? Number((resolvedEndpoints.length / realDirs.length).toFixed(4))
+			: 0,
+		unresolved,
+		detail: resolvedEndpoints.map((e) => ({
+			serverPath: e.serverPath,
+			convention: e.convention,
+			methods: e.methods,
+			routeCount: e.routeCount,
+			tables: e.tables,
+		})),
+	},
+	routeDefinitions: resolvedEndpoints.reduce(
+		(n: number, e: Endpoint) => n + e.routeCount,
+		0
+	),
+	tables: uniq(resolvedEndpoints.flatMap((e) => e.tables)),
+	tests: testCounts,
+	consumers: consumerHits,
+	accept: {
+		resolutionRate: {
+			need: CFG.acceptance.index_binding_resolution_rate,
+			got: realDirs.length
+				? Number((resolvedEndpoints.length / realDirs.length).toFixed(4))
+				: 0,
+			pass:
+				!realDirs.length ||
+				resolvedEndpoints.length / realDirs.length >=
+					CFG.acceptance.index_binding_resolution_rate,
+		},
+		screensFound: { got: screens.length, pass: screens.length > 0 },
+	},
+};
+
+const outDir = join(ROOT, CFG.paths.output, app, moduleName);
+mkdirSync(outDir, { recursive: true });
+writeFileSync(
+	join(outDir, "01-baseline.json"),
+	`${JSON.stringify({ spec, facts }, null, 2)}\n`
+);
+
+// ── readable .md — §8 P1 requires both ───────────────────────────────────────
+const md = [
+	`# ${app} / ${moduleName} — baseline`,
+	"",
+	`Generated by \`fem-baseline\` from \`_index/\` at \`${meta.ref.branch}@${meta.ref.sha}${meta.ref.dirty ? "-dirty" : ""}\`.`,
+	"Read-only. No application source was read by this step.",
+	"",
+	`## Screens — ${screens.length}`,
+	"",
+	"```",
+	...screens.map(
+		(p: Page) => `  S-${moduleName}-${shortId(p.route)}  ${p.route}`
+	),
+	"```",
+	"",
+	`> Matched on the first non-dynamic route segment, never a substring. \`*${moduleName}*\` would have`,
+	`> matched ${pagesDoc.pages.filter((p) => p.app === app && p.route.includes(moduleName)).length} pages across several modules.`,
+	"",
+	`## Bindings — ${mine.length} across ${facts.bindingFiles} files`,
+	"",
+	`## Endpoints — ${facts.endpoints.resolved} of ${facts.endpoints.total} resolved (${(facts.endpoints.resolutionRate * 100).toFixed(1)}%)`,
+	"",
+	"```",
+	...resolvedEndpoints.map(
+		(e) =>
+			`  ${e.serverPath.replace(SERVER_MODULES, "")}\n` +
+			`      ${e.convention} · ${e.routeCount} routes · ${e.methods.join(" ")} · ${e.tables.length} tables`
+	),
+	"```",
+	"",
+	`## Tables — ${facts.tables.length}`,
+	"",
+	"```",
+	...facts.tables.map((t: string) => `  ${t}`),
+	"```",
+	"",
+	"## Tests",
+	"",
+	"```",
+	`  server unit        ${testCounts.serverUnit}`,
+	`  server integration ${testCounts.serverIntegration}`,
+	`  frontend unit      ${testCounts.frontendUnit}`,
+	`  e2e api            ${testCounts.e2eApi}`,
+	`  e2e ui             ${testCounts.e2eUi}`,
+	`  e2e page objects   ${testCounts.e2ePageObjects}`,
+	"```",
+	"",
+	"## L12 — other consumers",
+	"",
+	Object.keys(consumerHits).length
+		? "```\n" +
+			Object.entries(consumerHits)
+				.map(([k, v]) => `  ${k}\n      → ${v.join(", ")}`)
+				.join("\n") +
+			"\n```\n\n" +
+			`> **Not empty.** A rename or removal here is a multi-app release. §9.2's\n> ×1.5 breaking-contract multiplier applies to any breaking change.`
+		: "```\n  none found\n```\n\n" +
+			"> `none` means **no web consumer**. The index sees cross-app use only\n> where an app imports a server Zod schema; `apps/student` imports none, so\n> an Expo consumer would be invisible here.",
+	"",
+	"## Acceptance — §8 P1",
+	"",
+	"| | Threshold | Measured | |",
+	"|---|---|---|---|",
+	`| Binding resolution | ≥ ${CFG.acceptance.index_binding_resolution_rate * 100}% | ${(facts.accept.resolutionRate.got * 100).toFixed(1)}% | ${facts.accept.resolutionRate.pass ? "PASS" : "FAIL"} |`,
+	`| Screens found | > 0 | ${screens.length} | ${facts.accept.screensFound.pass ? "PASS" : "FAIL"} |`,
+	"",
+	`**M1 exit also needs the module owner's review of this file.**`,
+	"",
+].join("\n");
+writeFileSync(join(outDir, "01-baseline.md"), md);
+
+console.log(
+	`fem-baseline · ${app}/${moduleName} · ${meta.ref.branch}@${meta.ref.sha}`
+);
+console.log(
+	`  screens ${screens.length} · bindings ${mine.length} · endpoints ${facts.endpoints.resolved}/${facts.endpoints.total} (${(facts.endpoints.resolutionRate * 100).toFixed(1)}%) · tables ${facts.tables.length}`
+);
+console.log(
+	`  ACCEPT ${facts.accept.resolutionRate.pass && facts.accept.screensFound.pass ? "PASS" : "FAIL"} → ${join(CFG.paths.output, app, moduleName)}/01-baseline.md`
+);

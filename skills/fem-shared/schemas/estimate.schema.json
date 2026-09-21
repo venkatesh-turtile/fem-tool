@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "fem estimate document (05-estimate.json)",
+  "type": "object",
+  "required": ["app", "module", "changes", "byLayer", "totals", "confidence"],
+  "properties": {
+    "app": { "type": "string" },
+    "module": { "type": "string" },
+    "ref": { "type": "object" },
+    "orderOfOperations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "$comment": "Echoed into the output so a reader can audit the arithmetic — NFR-6"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "p50", "p90", "confidence", "byLayer", "rubricRows"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "p50": { "type": "number" },
+          "p90": { "type": "number" },
+          "confidence": { "enum": ["High", "Medium", "Low"] },
+          "multipliers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "$comment": "includes CAPPED when riskMultiplierCap fires"
+          },
+          "byLayer": { "type": "object" },
+          "rubricRows": {
+            "type": "array",
+            "items": { "type": "string" },
+            "$comment": "NFR-6: every number traces to a rubric row"
+          }
+        }
+      }
+    },
+    "byLayer": { "type": "object" },
+    "totals": {
+      "type": "object",
+      "required": ["subtotalP50", "subtotalP90", "overheadRate", "p50", "p90"]
+    },
+    "confidence": { "enum": ["High", "Medium", "Low"] },
+    "assumedShare": { "type": "number" },
+    "topDrivers": { "type": "array" }
+  }
+}

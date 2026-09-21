@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "fem screen spec",
+  "$comment": "The normalised shape BOTH fem-baseline (old) and fem-design-intake (new) emit, so the two are directly comparable at P3.",
+  "type": "object",
+  "required": ["module", "app", "source", "screens"],
+  "properties": {
+    "app": {
+      "enum": ["cms", "student-cms", "admin"]
+    },
+    "module": {
+      "type": "string"
+    },
+    "source": {
+      "enum": ["repository", "design-html"]
+    },
+    "ref": {
+      "type": "object",
+      "$comment": "git ref for source=repository; file SHA-256 map for source=design-html"
+    },
+    "screens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "elements"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^S-[a-z0-9-]+-[0-9a-f]{6}$",
+            "$comment": "NFR-3: the suffix is a 6-char sha256 of the route (fem-baseline) or of '<screen>--<state>' (fem-design-intake), so removing a screen never renumbers the others."
+          },
+          "name": {
+            "type": "string"
+          },
+          "route": {
+            "type": ["string", "null"],
+            "$comment": "null for a new screen that has no route yet"
+          },
+          "file": {
+            "type": ["string", "null"]
+          },
+          "state": {
+            "enum": ["default", "empty", "loading", "error", "modal-open"],
+            "default": "default"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "kind", "label"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^E-"
+                },
+                "kind": {
+                  "enum": [
+                    "column",
+                    "field",
+                    "filter",
+                    "action",
+                    "tab",
+                    "dialog",
+                    "kpi",
+                    "search",
+                    "pagination",
+                    "empty-state",
+                    "error-state"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "binding": {
+                  "type": ["object", "null"],
+                  "$comment": "null means static text. Set by fem-baseline from _index; left null by fem-design-intake for P4 to resolve.",
+                  "properties": {
+                    "endpointId": {
+                      "type": "string"
+                    },
+                    "serverPath": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "table": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "static": {
+                  "type": "boolean",
+                  "default": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
