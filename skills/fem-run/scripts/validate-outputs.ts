@@ -301,7 +301,7 @@ if (want("P8")) {
 			[/\b(GET|POST|PUT|PATCH|DELETE)\s+\/[\w{}/:-]+/, "an endpoint path"],
 			[/\b\w+\.(ts|tsx)\b/, "a source file name"],
 			[/\b[a-z][a-z0-9]*_[a-z0-9_]+\b/, "a table or column name"],
-		] as Array<[RegExp, string]>) {
+		] as [RegExp, string][]) {
 			const hit = asked.match(pattern);
 			if (hit) {
 				err(
@@ -356,7 +356,7 @@ if (want("P8")) {
 				'SUMMARY.md: none of the plain-words buckets appear — carry "Needs a server change", "Not in the CMS today" and "Extra we must handle" over from 04-impact.md, or say in one line that a bucket is empty'
 			);
 		}
-		const jargon: Array<[RegExp, string]> = [
+		const jargon: [RegExp, string][] = [
 			[/\b(GET|POST|PUT|PATCH|DELETE)\s+\/[\w{}/:-]+/g, "an endpoint path"],
 			[/\b\w+\.(ts|tsx)\b/g, "a source file name"],
 			[/\b[a-z][a-z0-9]*_[a-z0-9_]+\b/g, "a table or column name"],
