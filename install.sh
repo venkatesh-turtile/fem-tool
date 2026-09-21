@@ -35,8 +35,9 @@ cat <<'NEXT'
 Next:
   1. Edit fem.config.json — the top half says where your apps, server and
      tests live. The bottom half is the estimating rubric; leave it alone.
-  2. Build the index once:
-       bun .claude/skills/fem-index/scripts/build-index.ts
-  3. Put a design at docs/fe-migration/designs/<app>/<module>/<module>.html
-  4. In Claude Code:  /fem-run <app> <module>
+  2. Put a design at docs/fe-migration/designs/<app>/<module>/<module>.html
+  3. In Claude Code:  /fem-run <app> <module>
+
+That is the whole thing. The run reads your codebase itself each time, so
+there is nothing to build or refresh by hand.
 NEXT

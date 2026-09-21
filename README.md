@@ -39,22 +39,30 @@ git clone <this-repo> fem
 That copies the skills into `<repo>/.claude/skills/` and leaves a starter
 `fem.config.json` if you do not have one.
 
-Then, once per repo:
-
-```bash
-bun .claude/skills/fem-index/scripts/build-index.ts
-```
-
-This reads your codebase and builds a map — route → component → hook → API
-client → server schema → handler → database tables, plus tests, dashboards and
-cross-app consumers. Every later phase queries the map instead of hunting
-through code. Rebuild it when your main branch moves.
-
 ## Use
 
-1. Put the design at `docs/fe-migration/designs/<app>/<module>/<module>.html`
-2. In Claude Code: `/fem-run <app> <module>`
-3. Approve the two gates when asked
+In Claude Code, point it at the design wherever it happens to be:
+
+```
+/fem-run cms academic-calendar ~/Downloads/Academic_Calendar_v4.html
+```
+
+Then approve the two gates when asked. That is the whole thing.
+
+The run files the design under its module, creates the results folder, and — if
+a run already exists for an older design — archives that run and its design
+together first, so nothing is lost and you can compare. Re-running with the
+same design resumes where you left off, gates and answers intact.
+
+The module name is given explicitly because it has to match the module in your
+codebase; a file called `Academic_Calendar_v4.html` cannot say which module it
+belongs to.
+
+There is no setup step to remember. Every run starts by reading your codebase
+and building its own map — route → component → hook → API client → server
+schema → handler → database tables, plus tests, dashboards and cross-app
+consumers. It takes about two seconds, and it means the analysis can never
+describe a codebase that has moved on.
 
 ## The eight phases, and the two gates
 

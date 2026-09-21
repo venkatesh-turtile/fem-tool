@@ -6,18 +6,47 @@ description: "Run the Frontend Migration Impact Workflow end to end for one modu
 # fem-run — the orchestrator
 
 ```bash
-/fem-run cms timetable
-/fem-run cms timetable --from P4     # resume
-/fem-run cms timetable --only P5     # re-run one phase after a rubric change
+/fem-run cms timetable ~/Downloads/whatever.html   # file it and run
+/fem-run cms timetable                             # design already in place
+/fem-run cms timetable --from P4                   # resume
+/fem-run cms timetable --only P5                   # re-run one phase
 ```
 
-## Before the first run
+**When a path to an HTML file is given, file it first** — do not ask the user
+to copy anything anywhere:
 
 ```bash
-bun .claude/skills/fem-index/scripts/build-index.ts       # once per programme
+bun .claude/skills/fem-run/scripts/install-design.ts cms timetable <path>
 ```
 
-And the designs must be in place:
+It creates both folders, copies the design in under the module's name, and — if
+a run already exists for an **older** design — archives that run and its design
+together as `<module>.runN-<date>` before the new one lands. Re-filing the same
+design is a no-op, so a resumed run keeps its gates and its answered questions.
+
+The module name stays explicit because it must match the module in the
+codebase; a file called `Academic_Calendar_UI_3D 4.html` cannot tell the
+workflow that the module is `academic-calendar`.
+
+## P0 · the index — rebuilt on every run, not by the user
+
+**Always run this first, before P1, without being asked:**
+
+```bash
+bun .claude/skills/fem-index/scripts/build-index.ts
+```
+
+It takes about two seconds on a repo of this size, so there is no reason to
+make anyone remember it, and no way for the analysis to describe a codebase
+that has moved on. A stale index is the quietest failure this workflow has:
+every number afterwards looks right and refers to code that changed last week.
+
+The user's whole job is `/fem-run <app> <module>` plus the two gates.
+
+If the build fails, stop and say so — do not fall back to an older index. A
+missing index is obvious; a stale one is not.
+
+If no path was given, the design must already be in place:
 
 ```
 docs/fe-migration/designs/<app>/<module>/<screen>--<state>.html
