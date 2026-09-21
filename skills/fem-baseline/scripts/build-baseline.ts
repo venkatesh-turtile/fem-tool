@@ -28,6 +28,8 @@ type Page = {
 	route: string;
 	file: string;
 	module: string | null;
+	usesModules?: string[];
+	usesFiles?: string[];
 };
 type Binding = {
 	app: string;
@@ -110,7 +112,22 @@ const segAfter = (route: string) => {
 };
 
 // ── bindings for this module ─────────────────────────────────────────────────
-const mine = bindings.filter((b) => b.app === app && b.module === moduleName);
+// By what the screens IMPORT, not by what they are called. /academic-structure
+// is served entirely out of modules/academic-nodes, and matching on the name
+// alone returned nothing at all — a screen with four routes and thirty-seven
+// bindings reported as calling no endpoints and touching no tables, which every
+// later phase would have repeated as fact.
+const reachedFiles = new Set<string>();
+for (const p of screens) {
+	for (const f of p.usesFiles ?? []) {
+		reachedFiles.add(f);
+	}
+}
+const mine = bindings.filter(
+	(b) =>
+		b.app === app &&
+		(b.module === moduleName || reachedFiles.has(b.clientFile))
+);
 const dirOf = (serverPath: string) => serverPath.replace(/\/[^/]*$/, "");
 const endpointDirs = uniq(mine.map((b) => dirOf(b.serverPath)));
 
@@ -190,6 +207,27 @@ const testCounts = {
 };
 
 // ── emit the screen spec ─────────────────────────────────────────────────────
+// Elements are the one part of this file a person writes, and rebuilding the
+// index is a routine thing to do mid-run. Overwriting them turns a two-second
+// rebuild into an hour of re-reading components, so anything already filled in
+// for a screen is carried across. Screen ids are content hashes of the route,
+// so a screen that survives keeps its work and a route that changed does not
+// inherit somebody else's.
+const priorElements = new Map<string, unknown[]>();
+const priorPath = join(ROOT, CFG.paths.output, app, moduleName, "01-baseline.json");
+if (existsSync(priorPath)) {
+	try {
+		const prior = JSON.parse(readFileSync(priorPath, "utf8"));
+		for (const sc of prior.spec?.screens ?? []) {
+			if (sc?.id && Array.isArray(sc.elements) && sc.elements.length > 0) {
+				priorElements.set(sc.id, sc.elements);
+			}
+		}
+	} catch {
+		// A half-written file is not a reason to refuse to build a new one.
+	}
+}
+
 const spec = {
 	app,
 	module: moduleName,
@@ -201,10 +239,11 @@ const spec = {
 		route: p.route,
 		file: p.file,
 		state: "default",
-		// Elements are populated by the model step — the script establishes the
-		// frame and the bindings; §8 P1 requires every element to carry a binding
-		// or be marked static.
-		elements: [] as unknown[],
+		// Populated by the model step — the script establishes the frame and the
+		// bindings; §8 P1 requires every element to carry a binding or be marked
+		// static. Kept across a rebuild when the screen is the same one.
+		elements: (priorElements.get(`S-${moduleName}-${shortId(p.route)}`) ??
+			[]) as unknown[],
 	})),
 };
 
@@ -240,6 +279,13 @@ const facts = {
 	tests: testCounts,
 	consumers: consumerHits,
 	accept: {
+		// 0 of 0 resolved is not 100%. A module whose screens reach no server
+		// schema at all is the quietest failure this phase has: every later
+		// phase repeats "no endpoints, no tables" as though it were a finding.
+		bindingsFound: {
+			got: mine.length,
+			pass: mine.length > 0,
+		},
 		resolutionRate: {
 			need: CFG.acceptance.index_binding_resolution_rate,
 			got: realDirs.length
@@ -354,6 +400,23 @@ console.log(
 console.log(
 	`  screens ${screens.length} · bindings ${mine.length} · endpoints ${facts.endpoints.resolved}/${facts.endpoints.total} (${(facts.endpoints.resolutionRate * 100).toFixed(1)}%) · tables ${facts.tables.length}`
 );
+const accepted =
+	facts.accept.resolutionRate.pass &&
+	facts.accept.screensFound.pass &&
+	facts.accept.bindingsFound.pass;
 console.log(
-	`  ACCEPT ${facts.accept.resolutionRate.pass && facts.accept.screensFound.pass ? "PASS" : "FAIL"} → ${join(CFG.paths.output, app, moduleName)}/01-baseline.md`
+	`  ACCEPT ${accepted ? "PASS" : "FAIL"} → ${join(CFG.paths.output, app, moduleName)}/01-baseline.md`
 );
+if (!facts.accept.bindingsFound.pass && facts.accept.screensFound.pass) {
+	// Loud, and it stops the run. A baseline saying "no endpoints, no tables"
+	// is indistinguishable from a screen that genuinely calls nothing, and the
+	// phases downstream cannot tell the difference either.
+	console.error(
+		`\n  ${screens.length} screens, and not one of them reaches a server schema.\n` +
+			"  That is almost always the module name, not the truth: the route and the\n" +
+			"  folder its code lives in can differ. Check what the page imports.\n" +
+			"  If the screens really do call nothing, say so in the baseline by hand\n" +
+			"  and re-run — do not let a silent zero flow downstream."
+	);
+	process.exit(1);
+}

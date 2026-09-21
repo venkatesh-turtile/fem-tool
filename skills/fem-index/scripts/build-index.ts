@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
  *   bun .claude/skills/fem-index/scripts/build-index.ts [--app cms] [--check]
  */
 import {
+	existsSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
@@ -114,7 +115,83 @@ type Page = {
 	route: string;
 	file: string;
 	module: string | null;
+	usesModules: string[];
+	usesFiles: string[];
 };
+
+// A route and the folder its code lives in are two different things. The CMS
+// serves /academic-structure entirely out of modules/academic-nodes, so matching
+// a screen to its data by NAME finds nothing and reports, with a straight face,
+// that the screen calls no endpoints and touches no tables.
+//
+// So follow what the page imports instead. Two hops is enough in practice: a
+// page imports a module's components, and those import the api client that
+// carries the binding.
+const MODULE_IMPORT_RE = /from\s+["']@[\w-]+\/modules\/([^/"']+)\/?([^"']*)["']/g;
+// Three hops: page → component → hook or api client. That is where a screen's
+// own data lives.
+//
+// Four was tried and reaches too far. On the academic calendar it pulled in the
+// dashboard statistics and the setup-progress endpoints, neither of which that
+// screen shows — they arrive through a shared institution hook, two rooms away.
+// An over-wide baseline is not a safe default: it inflates the tables a change
+// appears to touch, and the consumer checks that follow.
+const HOPS = 3;
+
+/**
+ * Every module FILE a page can reach, and the module names among them.
+ *
+ * Files, not modules, is the whole point. A screen that imports one component
+ * from HRMS reaches that component — not the two hundred bindings in HRMS.
+ * Selecting by module name inherits the entire folder and turns a four-screen
+ * module into forty-eight tables.
+ */
+function reachedFrom(
+	pageFile: string,
+	modRoot: string
+): { files: string[]; modules: string[] } {
+	const seen = new Set<string>();
+	const mods = new Set<string>();
+	let frontier = [pageFile];
+	for (let depth = 0; depth < HOPS && frontier.length > 0; depth++) {
+		const next: string[] = [];
+		for (const f of frontier) {
+			if (seen.has(f)) {
+				continue;
+			}
+			seen.add(f);
+			const src = read(f);
+			if (!src) {
+				continue;
+			}
+			for (const m of src.matchAll(MODULE_IMPORT_RE)) {
+				const mod = m[1];
+				if (!mod) {
+					continue;
+				}
+				mods.add(mod);
+				const stem = join(modRoot, mod, m[2] ?? "");
+				for (const candidate of [
+					`${stem}.ts`,
+					`${stem}.tsx`,
+					join(stem, "index.ts"),
+					join(stem, "index.tsx"),
+				]) {
+					if (existsSync(candidate)) {
+						next.push(candidate);
+						break;
+					}
+				}
+			}
+		}
+		frontier = next;
+	}
+	seen.delete(pageFile);
+	return {
+		files: [...seen].map(rel).sort(),
+		modules: [...mods].sort(),
+	};
+}
 
 function buildPages(): Page[] {
 	const pages: Page[] = [];
@@ -135,6 +212,10 @@ function buildPages(): Page[] {
 				route: route === "/." ? "/" : route,
 				file: rel(f),
 				module: seg[0] ?? null,
+				...(() => {
+					const r = reachedFrom(f, join(ROOT, cfg.modules));
+					return { usesModules: r.modules, usesFiles: r.files };
+				})(),
 			});
 		}
 	}
