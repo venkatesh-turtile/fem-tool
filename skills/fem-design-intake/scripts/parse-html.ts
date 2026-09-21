@@ -110,6 +110,7 @@ type Screen = {
 	state: string;
 	parseable: boolean;
 	diagnostics: unknown;
+	hiddenByCss?: Hidden[];
 	elements: El[];
 };
 type El = {
@@ -119,6 +120,93 @@ type El = {
 	binding: null;
 	static: boolean;
 };
+
+/**
+ * What the design DECLARES but never SHOWS.
+ *
+ * The parser reads markup and nothing else, so a column removed in CSS is
+ * invisible to it. On cms/academic-structure that mattered twice in one run:
+ * a subjects table declaring eleven columns showed seven, and two items were
+ * traced as new storage that the design had deliberately taken off the page —
+ * "the week is set where a subject is given to a class", "the lab is a row of
+ * its own here now". Both sentences were sitting in a comment above the rule.
+ *
+ * So: find `display:none` rules, work out which column each one removes, and
+ * carry the design's own explanation with it.
+ *
+ * It also catches the more valuable case. When a rule is qualified by a class
+ * on `body` — `body.coll` versus `body:not(.coll)` — the design is drawing TWO
+ * variants of the same screen, one per kind of institution. That is a finding
+ * about who the design serves, and it is the question every module has to
+ * answer.
+ */
+type Hidden = {
+	selector: string;
+	table: string | null;
+	columnIndex: number | null;
+	shownTo: string | null;
+	reason: string | null;
+};
+
+function hiddenByCss(raw: string): Hidden[] {
+	const found = new Map<string, Hidden>();
+	for (const style of all(raw, /<style[^>]*>([\s\S]*?)<\/style>/gi)) {
+		const css = style[1] ?? "";
+		// Walk rule by rule. The text between the previous rule and this one's
+		// brace holds the selector AND any comment above it, which is where the
+		// designer says why a column comes off the page.
+		let cursor = 0;
+		for (const rule of all(css, /\{([^{}]*)\}/g)) {
+			const at = rule.index ?? 0;
+			const head = css.slice(cursor, at);
+			cursor = at + rule[0].length;
+			const body = rule[1] ?? "";
+			if (!/display\s*:\s*none/i.test(body)) {
+				continue;
+			}
+			const comments = [...head.matchAll(/\/\*([\s\S]*?)\*\//g)].map((c) =>
+				(c[1] ?? "").replace(/\s+/g, " ").trim()
+			);
+			const reason = comments.length > 0 ? (comments.at(-1) ?? null) : null;
+			const selectors = head.replace(/\/\*[\s\S]*?\*\//g, "").trim();
+			for (const sel of selectors.split(",")) {
+				const one = sel.trim();
+				if (!one) {
+					continue;
+				}
+				const nth = /nth-child\(\s*(\d+)\s*\)/.exec(one);
+				const table = /\[data-t=["']([^"']+)["']\]/.exec(one)?.[1] ?? null;
+				const bodyClass = /body\s*(:not\()?\.([\w-]+)\)?/.exec(one);
+				let shownTo: string | null = null;
+				if (bodyClass) {
+					shownTo = bodyClass[1]
+						? `only when the page has .${bodyClass[2]}`
+						: `only when the page does NOT have .${bodyClass[2]}`;
+				}
+				// thead th:nth-child(n) and tbody td:nth-child(n) are two
+				// selectors for one hidden column. Report the column, once.
+				const key = `${table}|${nth?.[1] ?? one}|${shownTo ?? ""}`;
+				const prior = found.get(key);
+				if (prior) {
+					// Keep whichever spelling carried the explanation.
+					if (!prior.reason && reason) {
+						prior.reason = reason;
+					}
+					continue;
+				}
+				found.set(key, {
+					selector: one,
+					table,
+					columnIndex: nth?.[1] ? Number.parseInt(nth[1], 10) : null,
+					shownTo,
+					reason,
+				});
+			}
+		}
+	}
+	return [...found.values()];
+}
+
 function elements(raw: string, sid: string): El[] {
 	const h = strip(raw);
 	const out: { kind: string; label: string }[] = [];
@@ -213,6 +301,44 @@ files.forEach((f, i) => {
 	if (!els.some((e) => e.kind === "empty-state")) {
 		questions.push(`${f}: no empty state visible — is one designed?`);
 	}
+	// What is in the markup but not on the page. Columns first: they are what
+	// a change catalogue is built from, and a column nobody sees is not a
+	// column the backend has to serve.
+	const hidden = hiddenByCss(raw);
+	const hiddenCols = hidden.filter((x) => x.columnIndex !== null);
+	if (hiddenCols.length > 0) {
+		questions.push(
+			`${f}: **${hiddenCols.length} column(s) are declared but hidden in CSS.** ` +
+				"The parser reads markup, not styles, so they appear in the element " +
+				"list above as though they were on screen. Check each before it is " +
+				"traced as work:\n" +
+				hiddenCols
+					.map(
+						(x) =>
+							`  - column ${x.columnIndex}${x.table ? ` of the \`${x.table}\` table` : ""}` +
+							`${x.shownTo ? `, shown ${x.shownTo}` : ", hidden from everyone"}` +
+							`${x.reason ? ` — the design says: "${x.reason.slice(0, 180)}"` : ""}`
+					)
+					.join("\n")
+		);
+	}
+	// A rule keyed on a class on <body> means the design draws more than one
+	// version of this screen. Who each version is for is the question every
+	// module has to answer, and it is answerable here.
+	// Only the classes that gate COLUMNS. A design uses body classes for all
+	// sorts of panel state; a class that decides which columns a table has is
+	// the design drawing two versions of one screen, and that is a finding.
+	const variants = [
+		...new Set(hiddenCols.map((x) => x.shownTo).filter(Boolean)),
+	];
+	if (variants.length > 0) {
+		questions.push(
+			`${f}: **this design draws more than one version of the same table**, ` +
+				`switched by a class on the page — ${variants.join("; ")}. ` +
+				"That is usually one version per kind of institution. Say which is " +
+				"which, and whether both are in scope."
+		);
+	}
 	screens.push({
 		id: `S-${sid}`,
 		name: base,
@@ -221,6 +347,7 @@ files.forEach((f, i) => {
 		state,
 		parseable: true,
 		diagnostics: p,
+		hiddenByCss: hidden,
 		elements: els,
 	});
 });
