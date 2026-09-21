@@ -50,6 +50,46 @@ Two fixes:
   days, and **NFR-7 changes** from *"parse, never execute"* to *"execute
   sandboxed, no network, then parse"*
 
+## What the markup declares and the page never shows
+
+**The parser reads markup, not styles.** A column removed with `display:none`
+is in the element list exactly as though it were on screen, and it will be
+traced as work and priced.
+
+This is not hypothetical. On `cms/academic-structure` a subjects table declared
+eleven columns and showed seven. Two of the four hidden ones were traced as new
+database columns before anyone noticed, and the design had explained itself in a
+comment directly above each rule:
+
+> *"the week is set where a subject is given to a class, not in the catalogue"*
+> *"the lab is a row of its own here now"*
+
+The parser now reports them — `hiddenByCss` in `02-new-design.json`, and a
+question naming each column with the design's own reason. **Read that question
+before cataloguing anything.** A column nobody sees is not a column the backend
+has to serve.
+
+### A class on `<body>` means two versions of one screen
+
+When the hiding is conditional — `body.coll` versus `body:not(.coll)` — the
+design is drawing the same table two ways, and that is nearly always **one per
+kind of institution**. The same file answered the college question that way:
+a school is shown "needs a lab"; a college is shown "department" and "domain"
+instead.
+
+That is a finding about **who the design serves**, which every module has to
+answer, and it is answerable here rather than guessed at P3. Say which version
+is for whom, and whether both are in scope.
+
+### The design may also contradict an answer
+
+A hidden column with an explanation is the design saying what it thinks that
+column is. If someone has already answered differently — "it is a maximum the
+school types", where the design says "it is the roll, counted" — that is a
+conflict, not a detail. Put it back to them as a question naming both, and if
+the decision stands against the design, record it as a deviation: the screen has
+to show what the design takes off the page.
+
 ## Constraints
 
 - **NFR-7** HTML is untrusted. Parse with regex over raw text; never execute,

@@ -173,7 +173,33 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 		changes.map((c: Record<string, never>) => [c.id as string, c])
 	);
 
-	// A · P3 catalogued more than P4 traced
+	// N · the design hid columns and nobody said what happened to them.
+// The parser reads markup, not styles, so a hidden column arrives in the
+// element list looking like any other. Two were traced as new database columns
+// on cms/academic-structure before a human noticed they were never on screen.
+if (want("P4") && existsSync(join(dir, "02-new-design.json"))) {
+	const design = JSON.parse(
+		readFileSync(join(dir, "02-new-design.json"), "utf8")
+	);
+	const hiddenCols = (design.screens ?? []).flatMap(
+		(sc: { hiddenByCss?: { columnIndex: number | null }[] }) =>
+			(sc.hiddenByCss ?? []).filter((x) => x.columnIndex !== null)
+	);
+	if (hiddenCols.length > 0) {
+		const impactMd = join(dir, "04-impact.md");
+		const said =
+			existsSync(impactMd) && /hidden|not shown|off the page/i.test(
+				readFileSync(impactMd, "utf8")
+			);
+		if (!said) {
+			err(
+				`02-new-design.json reports ${hiddenCols.length} column(s) the design declares but hides, and 04-impact.md never mentions them — say which are out of scope and why, or a hidden column gets priced as work`
+			);
+		}
+	}
+}
+
+// A · P3 catalogued more than P4 traced
 	if (
 		typeof doc.catalogueSize === "number" &&
 		changes.length < doc.catalogueSize
