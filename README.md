@@ -1,17 +1,22 @@
 # Frontend Migration Impact Workflow
 
-> **Set it up in three commands.** Full explanation below.
+> **One command, nothing to clone.** Stand in the repo you want it in:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/venkatesh-turtile/fem-tool/main/install.sh | bash
+> ```
+>
+> Then, in Claude Code inside that repo:
+>
+> ```
+> /fem-run cms academic-calendar ~/Downloads/Academic_Calendar.html
+> ```
+>
+> Prefer a clone — to read it first, or to work on it? That works too:
 >
 > ```bash
 > git clone https://github.com/venkatesh-turtile/fem-tool.git ~/fem-tool
 > ~/fem-tool/install.sh /path/to/your-repo
-> cd /path/to/your-repo && $EDITOR fem.config.json   # check the top half
-> ```
->
-> Then, in Claude Code inside your repo:
->
-> ```
-> /fem-run cms academic-calendar ~/Downloads/Academic_Calendar.html
 > ```
 
 You have a new design for a screen. Before anyone builds it, you want to know:
@@ -51,21 +56,39 @@ Database and API changes are the obvious ones. The ones teams miss:
 
 ## Setting it up, step by step
 
-**1 · Clone it somewhere outside the repo you will analyse.** It is its own git
-repository; nesting one inside another only causes confusion later.
+There are two ways in, and they install exactly the same thing.
+
+**The short way — no clone.** Stand in the repo you want the tool in and run:
+
+```bash
+cd /path/to/your-repo
+curl -fsSL https://raw.githubusercontent.com/venkatesh-turtile/fem-tool/main/install.sh | bash
+```
+
+It downloads this repo to a temporary folder, copies the fourteen `fem-*` skills
+into `.claude/skills/`, drops in a starter `fem.config.json` if you have none,
+and deletes the temporary folder. Nothing else is touched: no git operations, no
+dependencies, no build. Run it again whenever you want the latest — your
+`fem.config.json` is left alone.
+
+Pin a branch or a fork if you need to:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/venkatesh-turtile/fem-tool/main/install.sh \
+  | FEM_REF=some-branch bash
+```
+
+**The long way — clone it.** Better if you want to read the skills before
+running them, or change them. Clone it *outside* the repo you will analyse; one
+git repository inside another only causes confusion later.
 
 ```bash
 git clone https://github.com/venkatesh-turtile/fem-tool.git ~/fem-tool
+~/fem-tool/install.sh /path/to/your-repo     # or run it with no argument from inside the repo
 ```
 
-**2 · Install it into your repo.** This copies the fourteen `fem-*` skills into
-`<repo>/.claude/skills/`, and drops in a starter `fem.config.json` if you do not
-already have one. It touches nothing else — no git operations, no dependencies,
-no build.
-
-```bash
-~/fem-tool/install.sh /path/to/your-repo
-```
+Run from a clone, the script copies from that clone and never touches the
+network — so a change you are testing is the change that gets installed.
 
 **3 · Check the config.** `fem.config.json` has two halves. The top says where
 your apps, server, tests and dashboards live — change it for your repo. The
@@ -89,8 +112,8 @@ printf '.claude/skills/fem-*\nfem.config.json\n' >> .git/info/exclude
 Nothing else to prepare — no index to build, no folders to create, no design to
 file by hand. The run does all of it.
 
-**Updating later:** `git -C ~/fem-tool pull` then run `install.sh` again. Your
-`fem.config.json` is left as it is.
+**Updating later:** run the same one-liner again, or `git -C ~/fem-tool pull`
+and re-run `install.sh`. Your `fem.config.json` is left as it is.
 
 ## Use
 
