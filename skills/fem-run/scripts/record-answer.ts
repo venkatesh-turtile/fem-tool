@@ -57,9 +57,7 @@ if (!existsSync(questionsAt)) {
 
 const text = readFileSync(questionsAt, "utf8");
 const lines = text.split("\n");
-const heading = lines.findIndex((l) =>
-	new RegExp(`^###\\s+${qid}\\s`).test(l)
-);
+const heading = lines.findIndex((l) => new RegExp(`^###\\s+${qid}\\s`).test(l));
 if (heading === -1) {
 	console.error(
 		`questions.md has no "### ${qid} · …" heading.\n` +

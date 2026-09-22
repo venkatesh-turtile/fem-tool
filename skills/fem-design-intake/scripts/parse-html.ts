@@ -409,16 +409,48 @@ writeFileSync(
 		2
 	)}\n`
 );
-writeFileSync(
-	join(outDir, "questions.md"),
-	`# ${app} / ${moduleName} — ambiguity questions\n\n` +
-		"Spec §8 P2: raise questions, never guess silently. Unanswered questions take\n" +
-		"P90 to x2.0 (§9.3) and block gate 2 for the items they touch.\n\n" +
-		(questions.length
-			? questions.map((q, i) => `${i + 1}. ${q}`).join("\n\n")
-			: "_none_") +
-		"\n"
-);
+// questions.md is written here and then WRITTEN IN by a person: the questions
+// get rewritten for a reader, answers are filed under them, and later phases
+// add the plain-words verdict at the top. Rebuilding the design — which is a
+// routine thing to do — used to replace the lot, and it did exactly that
+// during a smoke test: seven recorded answers gone in one command. The answers
+// survived only because record-answer.ts also writes them to state.json.
+//
+// So the parser owns one marked block and nothing else. Everything a person
+// wrote stays where they put it.
+const OPEN = "<!-- fem:parser-findings -->";
+const CLOSE = "<!-- /fem:parser-findings -->";
+const findings =
+	`${OPEN}\n` +
+	"## What the parser noticed\n\n" +
+	"Raised automatically from the design file. Rewrite these as questions for a\n" +
+	"reader, or delete the ones that do not apply — this block is replaced on\n" +
+	"every re-run, and nothing outside it is touched.\n\n" +
+	(questions.length
+		? questions.map((q, i) => `${i + 1}. ${q}`).join("\n\n")
+		: "_none_") +
+	`\n${CLOSE}\n`;
+
+const questionsPath = join(outDir, "questions.md");
+if (existsSync(questionsPath)) {
+	const prior = readFileSync(questionsPath, "utf8");
+	const from = prior.indexOf(OPEN);
+	const to = prior.indexOf(CLOSE);
+	writeFileSync(
+		questionsPath,
+		from !== -1 && to > from
+			? prior.slice(0, from) + findings + prior.slice(to + CLOSE.length + 1)
+			: `${prior.trimEnd()}\n\n${findings}`
+	);
+} else {
+	writeFileSync(
+		questionsPath,
+		`# ${app} / ${moduleName} — what we could not decide on our own\n\n` +
+			"Spec §8 P2: raise questions, never guess silently. Unanswered questions\n" +
+			"take P90 to x2.0 (§9.3) and block gate 2 for the items they touch.\n\n" +
+			findings
+	);
+}
 
 console.log(`fem-design-intake · ${app}/${moduleName}`);
 console.log(
