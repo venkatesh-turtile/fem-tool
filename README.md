@@ -75,8 +75,15 @@ afterwards. Piped through a shell there is no argument to read, so it installs
 into the **current directory** — it warns you if that directory has no `.git`
 and no `package.json`, which is the one way to get this wrong quietly.
 
-**Updating** is the same command again. Your `fem.config.json` is never
-overwritten.
+**Updating** is the same command again — there is no separate update step and
+nothing to uninstall first. It replaces the skills with the current ones and
+removes any that have gone upstream, so you never end up running a skill that
+no longer exists. Your `fem.config.json` is never overwritten, and anything
+under `docs/fe-migration/` is untouched, so runs you have already finished
+survive the update.
+
+There is no version to check. If you are unsure whether you have the latest,
+run it again — it costs a second and is safe to repeat.
 
 **Pinning a branch or a fork:**
 
