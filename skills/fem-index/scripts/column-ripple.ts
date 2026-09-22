@@ -184,13 +184,16 @@ for (const e of owners) {
 					? "query"
 					: "the entity";
 		const verdict =
-			kind === "response"
-				? "**yes** — so the screen can read it back"
-				: kind === "request"
-					? "**yes** — it is what the caller sets"
-					: kind === "query"
-						? "only if the screen filters by it"
-						: "**yes** — this is the row itself";
+			// A delete response says what happened, not what the row held.
+			/^Delete/.test(o) && kind === "response"
+				? "no — a delete response carries no row"
+				: kind === "response"
+					? "**yes** — so the screen can read it back"
+					: kind === "request"
+						? "**yes** — it is what the caller sets"
+						: kind === "query"
+							? "only if the screen filters by it"
+							: "**yes** — this is the row itself";
 		console.log(
 			`| \`${o}\` | ${kind} | ${verdict} | \`${e.routeFile?.split("modules/").pop() ?? "—"}\` |`
 		);
