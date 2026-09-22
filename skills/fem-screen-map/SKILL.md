@@ -73,8 +73,10 @@ P3 is the first phase that can see old and new together, so it is the first that
 can ask a question worth asking: does this design still fit a college, is a
 capability actually removed or only moved, is a screen a replacement or a split.
 
-**Ask them here, not at P4.** A question asked one phase late has already been
-traced and priced as a guess. One `AskUserQuestion` call per question, options
+**Record them here, not at P4.** Take the design as drawn; a difference the
+comparison raises is a line in the change catalogue, not a question. Ask only
+for a decision that is not about the design — see
+`.claude/skills/fem-shared/asking-questions.md`. One `AskUserQuestion` call per question, options
 plus "Leave it open", the person's own answer welcome — the convention is
 `.claude/skills/fem-shared/asking-questions.md`.
 

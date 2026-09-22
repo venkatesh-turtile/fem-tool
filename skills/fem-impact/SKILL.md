@@ -192,11 +192,13 @@ all the way down to "stored nowhere", or an option whose cost depends on an
 answer nobody has given. Each one becomes `impact.LN.blockedOnQuestion`, and a
 blocked item's bad case is **twice** its likely case.
 
-So P4 does not hand the question over as a file. It **asks it in the terminal**,
-one `AskUserQuestion` call per question, biggest-cost question first, with
-"Leave it open" always offered and the person's own answer — the built-in
-"Other" — welcome. The convention is
-`.claude/skills/fem-shared/asking-questions.md`.
+**Price it as the design draws it, and write down what the alternative would
+cost.** A field the design shows is a field; a rule it does not draw is not one.
+Put the difference in the report as a named decision with its price, rather than
+stopping to ask — see `.claude/skills/fem-shared/asking-questions.md`. Ask only
+when the answer is a business or policy choice: a protected characteristic in a
+refusal path, existing rows that must be re-labelled, two answers that
+contradict.
 
 ```bash
 bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q1 b "<who>"

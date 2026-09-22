@@ -135,21 +135,15 @@ happens.
    the change catalogue, not a fresh one — decisions survive (NFR-3).
 4. **Never write outside `docs/fe-migration/`** (NFR-1).
 5. **Quote the index ref** with any number you report.
-6. **The phase that raises a question asks it.** Not the next phase, not the
-   gate, not the report — P2 asks the design's questions, P3 the comparison's
-   before gate 1, P4 what tracing turned up, P6 whatever is left. Every kind goes
-   through `AskUserQuestion`: one call per question, options, "Leave it open" or
-   "Skip for now", and the person's own answer always welcome.
-   `.claude/skills/fem-shared/asking-questions.md` is the convention; answers are
-   recorded with `record-answer.ts` and survive a resume.
-7. **Every answer is re-checked before the run moves on.** An answer can kill a
-   cheaper option, contradict another answer, break something the other option
-   did not, or raise a question nobody has asked. See
-   `.claude/skills/fem-shared/answer-consequences.md` — re-check, ask what it
-   turns up, check again, and re-trace plus re-estimate whatever moved. A phase
-   is not done while that loop is still finding things.
-8. **Gate 2 is refused** while a mandatory question is neither answered nor
-   explicitly left open.
+6. **Do not interview the person running it.** Take the design as drawn and
+   report what it shows. A question is warranted only when answering it is a
+   business or policy choice the design cannot contain and the code cannot
+   reveal — see `.claude/skills/fem-shared/asking-questions.md`. Everything else
+   is a line in the report, priced both ways.
+7. **Re-check any answer you do get.** It can kill a cheaper option or
+   contradict an earlier one — `.claude/skills/fem-shared/answer-consequences.md`.
+8. **No question blocks a gate.** An open point is reported, priced with its
+   uncertainty, and the run continues.
 
 ## Time
 

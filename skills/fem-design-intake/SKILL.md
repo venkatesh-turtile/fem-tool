@@ -137,8 +137,11 @@ wide for the wrong reason.
 
 ## Ask them — do not leave a file and hope
 
-Writing the file is half the job. **Ask every question this phase raised — the
-optional ones too — in the terminal before P2 is recorded**, with `AskUserQuestion`: one call per question, the
+**Do not ask them.** Take the design as drawn and record what it shows.
+`questions.md` is a record of what was noticed, not a form to fill in — see
+`.claude/skills/fem-shared/asking-questions.md`. Ask only when answering is a
+business or policy choice the design cannot contain and the code cannot reveal;
+everything else, with `AskUserQuestion`: one call per question, the
 lettered choices as the options, "Leave it open" always available, and the
 person's own answer — the built-in "Other" — treated as the best answer of all.
 

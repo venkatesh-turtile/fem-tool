@@ -229,24 +229,19 @@ tomorrow. Change the design and re-run: the file's hash is stored, the phases
 after it are invalidated, and you see a **diff** of the change list rather than
 a fresh one — earlier decisions survive.
 
-Anything the workflow cannot determine becomes a question rather than a guess —
-and it **asks you, in the terminal, with options**, in the phase that raised it.
-You pick one, or give your own answer, or say "leave it open". Nothing is left
-in a file for somebody to find later.
+**It does not interview you.** It takes the design as drawn, compares it with
+what the screen does today, and writes down what it finds. A column the design
+shows is a column; a rule it does not draw is not one.
 
-Then it re-checks what your answer did. An answer can kill a cheaper option,
-contradict an earlier answer, or raise something nobody asked — so it looks,
-asks again if it finds something, and keeps going until a pass turns up nothing
-new. Whatever moved is re-traced and re-priced, and the report says what changed
-and why.
+Anything still to be decided is reported rather than asked: named in the
+summary's appendix, priced both ways in the decisions sheet, and traced in the
+report with the evidence beside it. You decide when you read it, which is when
+you were going to decide anyway.
 
-In the run this was built from, that loop reversed one recommendation and
-removed a feature worth 2.2 days. Answering the questions took the bad case from
-33 days to 21, and the confidence from Medium to High.
-
-A question still unanswered widens the estimate — uncertainty shows up in the
-number instead of hiding in it — and gate 2 is refused while a mandatory one is
-neither answered nor explicitly left open.
+It asks only when answering is a business or policy choice the design cannot
+contain and the code cannot reveal — a protected characteristic in a refusal
+path, existing rows that would have to be re-labelled, two decisions that
+contradict each other. **No question blocks a gate.**
 
 ## Docs
 

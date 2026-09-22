@@ -97,7 +97,7 @@ gets the full treatment: shape, then the six rules.
 
 ---
 
-## 5 · The thirteen rules, in plain words
+## 5 · The twelve rules, in plain words
 
 | | In one line | What it stops |
 |---|---|---|
@@ -107,7 +107,6 @@ gets the full treatment: shape, then the six rules.
 | **D** | "We assumed this" with no note of what was searched | A guess dressed as a finding |
 | **E** | A layer is blocked on a question, but the change says it isn't | Blocked work being quietly counted as settled |
 | **F** | **"My cost is covered by C-019" — but C-019 pays nothing** | **Work with no owner. This is the one that failed three times** |
-| **G** | A mandatory question reached gate 2 with nobody having answered it | A decision sheet built on a shrug. Every blocked item is priced at double, and doubled numbers read like estimates |
 | **H** | An item still says it is waiting on a question that has been answered | The answer never reached the trace, so the price still reflects the old uncertainty |
 | **I** | The trace is older than the answers it is supposed to reflect | Answering and then not re-tracing. The number cannot have accounted for something given after it was written |
 | **J** | Answers were recorded, but nothing says what they changed | A number that silently improves is indistinguishable from one that is wrong |
@@ -128,7 +127,14 @@ that read it — and rule L refuses an unevidenced "none" on any change that
 touches the contract, the handler or the schema. Say who you checked, or say
 what you searched.
 
-### Rules G to J — the answer loop
+### Rules H to J — the answer loop
+
+Rule **G** used to sit here: it refused a decisions sheet while a question was
+unanswered. It was removed, because it assumed the workflow's job was to extract
+answers. It is not — the job is to compare a design with what exists and price
+the difference. An open point is reported in the sheet with what each way would
+cost, and the person decides with the evidence in front of them.
+
 
 These four came out of one run, in one afternoon, in this order: a gate was
 presented while four questions were unanswered; an answer was given and the item

@@ -458,6 +458,75 @@ if (want("P5") || want("P6") || want("P8")) {
 	}
 }
 
+// G is gone. It refused a decisions sheet while a question was unanswered,
+// which assumed the workflow's job was to extract answers. It is not: the job
+// is to compare a design with what exists and price the difference. An open
+// point is now reported in the sheet with what each way would cost, and the
+// person decides with the evidence in front of them rather than in a prompt.
+
+// H, I, J · an answer that never reached the trace.
+// Each of these happened by hand before it was automated: an item left marked
+// blocked on a question that had been answered; a trace older than the answers
+// it was supposed to reflect; and a number that silently improved with nothing
+// saying why. See fem-shared/answer-consequences.md.
+if (want("P5") || want("P6") || want("P8")) {
+	const statePath = join(dir, "state.json");
+	const impactPath = join(dir, "04-impact.json");
+	if (existsSync(statePath) && existsSync(impactPath)) {
+		const state = JSON.parse(readFileSync(statePath, "utf8"));
+		const answers: Record<string, { at?: string; choice?: string }> =
+			state.answers ?? {};
+		const answered = new Set(
+			Object.entries(answers)
+				.filter(([, a]) => a.choice !== "open")
+				.map(([q]) => q)
+		);
+		if (answered.size > 0) {
+			const impact = JSON.parse(readFileSync(impactPath, "utf8"));
+			// H · answered, but the item still says it is waiting
+			for (const c of impact.changes ?? []) {
+				for (const [L, layer] of Object.entries(
+					(c.impact ?? {}) as Record<string, { blockedOnQuestion?: string }>
+				)) {
+					const q = layer?.blockedOnQuestion;
+					if (q && answered.has(q)) {
+						err(
+							`${c.id} ${L}: blocked on ${q}, which has been answered — re-trace the item with the answer in hand, then re-run P5`
+						);
+					}
+				}
+			}
+			// I · the trace predates the answers it should reflect.
+			// Recorded times, not file mtimes: a copy or a checkout rewrites an
+			// mtime and would quietly disarm this.
+			const tracedAt = state.phaseTimes?.P4
+				? Date.parse(state.phaseTimes.P4)
+				: Number.NaN;
+			if (!Number.isNaN(tracedAt)) {
+				for (const [q, a] of Object.entries(answers)) {
+					const at = a.at ? Date.parse(a.at) : Number.NaN;
+					if (!Number.isNaN(at) && at > tracedAt) {
+						err(
+							`the answer to ${q} was given after P4 was recorded — the trace cannot reflect it. Re-trace the items that named it, re-run P5, then record P4 again`
+						);
+						break;
+					}
+				}
+			}
+			// J · a number that moved, with nothing saying why
+			const impactMd = join(dir, "04-impact.md");
+			if (
+				existsSync(impactMd) &&
+				!readFileSync(impactMd, "utf8").includes("What the answers changed")
+			) {
+				err(
+					'04-impact.md: answers were recorded but there is no "What the answers changed" section — say what moved, and which answers changed the work rather than confirming it'
+				);
+			}
+		}
+	}
+}
+
 // G · a mandatory question reached gate 2 with nobody having answered it.
 // The whole point of asking in the terminal is that this can no longer happen
 // by drift: an item blocked on an unanswered question is priced at x2.0, and a
