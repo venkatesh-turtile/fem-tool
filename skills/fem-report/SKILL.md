@@ -19,6 +19,35 @@ Do not merge them. UX reading about composite indexes is how a scope
 conversation turns into an architecture argument. A manager reading REPORT.md
 is how a clear decision gets lost in forty tables.
 
+## REPORT.md — say where a new key actually goes
+
+A developer reading *"one additive field, nothing breaking"* still has to work
+out which schema objects gain it, which handlers must select it and which
+front-end files need an input. In a schema-first codebase that is answerable,
+not a judgement call — so answer it.
+
+**For every new column or key, REPORT.md carries the ripple, key by key:**
+
+```bash
+bun .claude/skills/fem-index/scripts/column-ripple.ts cms/academic/subjects needs_lab
+```
+
+It prints three tables, ready to paste:
+
+1. **the server contracts that gain the key** — each schema object, what kind it
+   is (the row, a request, a response, a query) and whether the key belongs in
+   it. Request and response are different answers, and a query only gains it if
+   the screen filters by it
+2. **the handlers** that must read, write and return it — this repo forbids
+   `select()` without explicit columns, so every read names its columns and each
+   one has to add the key
+3. **the front-end files** that import those schemas, and which of them need an
+   actual input rather than just the type
+
+This belongs in **REPORT.md only**. `SUMMARY.md` says "one new thing to store,
+on the subject" and stops; a table of file paths is exactly what does not belong
+in front of someone who does not read code.
+
 ## SUMMARY.md — the one-page plain summary
 
 Write it **after** REPORT.md, from REPORT.md and `06-decisions.md` only, so it
