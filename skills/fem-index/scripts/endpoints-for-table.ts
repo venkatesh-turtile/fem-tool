@@ -59,10 +59,16 @@ const writes = (e: Endpoint) =>
 // The LAST segment of the table name is the one that identifies it. Splitting
 // the whole path matched "cms", which every endpoint in the tree contains, so
 // forty-four endpoints all looked like they belonged to it.
+// Compare with the punctuation taken out. The table is `leave-requests` and
+// the endpoints that own it are called `leaverequest` — a literal match finds
+// neither, and reports that nothing owns the table.
+const flat = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
 const own = (table.split("/").pop() ?? table).replace(/s$/, "");
-const words = [own, `${own}s`].filter((w) => w.length > 2);
-const affinity = (e: Endpoint) =>
-	words.filter((w) => e.serverPath.includes(w)).length;
+const words = [own, `${own}s`].filter((w) => w.length > 2).map(flat);
+const affinity = (e: Endpoint) => {
+	const path = flat(e.serverPath);
+	return words.filter((w) => path.includes(w)).length;
+};
 const sorted = [...hits].sort(
 	(a, b) =>
 		affinity(b) - affinity(a) ||
@@ -81,6 +87,11 @@ const show = (e: Endpoint) => {
 };
 
 console.log(`${hits.length} endpoint(s) touch ${table}\n`);
+if (owners.length === 0) {
+	console.log(
+		"── none of them is named after this table; the list below is everything ──\n"
+	);
+}
 if (owners.length > 0) {
 	console.log(`── ${owners.length} that belong to it ──\n`);
 	for (const e of owners) {
