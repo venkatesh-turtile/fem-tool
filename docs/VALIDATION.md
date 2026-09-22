@@ -97,7 +97,7 @@ gets the full treatment: shape, then the six rules.
 
 ---
 
-## 5 · The twelve rules, in plain words
+## 5 · The thirteen rules, in plain words
 
 | | In one line | What it stops |
 |---|---|---|
@@ -112,6 +112,7 @@ gets the full treatment: shape, then the six rules.
 | **I** | The trace is older than the answers it is supposed to reflect | Answering and then not re-tracing. The number cannot have accounted for something given after it was written |
 | **J** | Answers were recorded, but nothing says what they changed | A number that silently improves is indistinguishable from one that is wrong |
 | **K** | The three plain sentences differ between the three files | A summary promising a free option the impact document already ruled out |
+| **O** | A new endpoint priced with no record of looking for the one that exists | Nine days of already-built work, across two modules, in documents that had passed every other check |
 | **M** | A change filed against a screen that does not exist | Screen ids are content hashes, so one typed from memory looks exactly like one that was read. A whole trace was once filed against an invented id and every other check passed |
 | **L** | "No one else is affected", with nothing cited | The cheapest sentence in the document to write, and the most expensive to be wrong about. The index now answers it mechanically |
 
