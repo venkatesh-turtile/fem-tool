@@ -71,15 +71,18 @@ const { endpoints } = load<{ endpoints: Endpoint[] }>("endpoints.json");
 // normal thing to meet. Say what to do rather than dying on a missing file —
 // the orchestrator rebuilds the index every run, so this only bites someone
 // running the phase by hand.
-const tableReaders: Record<string, string[]> = existsSync(
-	join(IDX, "table-readers.json")
-)
-	? load<{ tableReaders: Record<string, string[]> }>("table-readers.json")
-			.tableReaders
-	: (console.warn(
-			"  note: no table-readers.json — rebuild the index to see who else reads these tables"
-		),
-		{});
+function loadTableReaders(): Record<string, string[]> {
+	if (existsSync(join(IDX, "table-readers.json"))) {
+		return load<{ tableReaders: Record<string, string[]> }>(
+			"table-readers.json"
+		).tableReaders;
+	}
+	console.warn(
+		"  note: no table-readers.json — rebuild the index to see who else reads these tables"
+	);
+	return {};
+}
+const tableReaders = loadTableReaders();
 const { consumers } = load<{ consumers: Record<string, string[]> }>(
 	"consumers.json"
 );
@@ -125,8 +128,7 @@ for (const p of screens) {
 }
 const mine = bindings.filter(
 	(b) =>
-		b.app === app &&
-		(b.module === moduleName || reachedFiles.has(b.clientFile))
+		b.app === app && (b.module === moduleName || reachedFiles.has(b.clientFile))
 );
 const dirOf = (serverPath: string) => serverPath.replace(/\/[^/]*$/, "");
 const endpointDirs = uniq(mine.map((b) => dirOf(b.serverPath)));
@@ -162,11 +164,7 @@ const realDirs = endpointDirs.filter((d) => {
 // ── L12: who else consumes the server modules this module uses ───────────────
 const consumerHits: Record<string, string[]> = {};
 for (const d of endpointDirs) {
-	const key = d
-		.replace(SERVER_MODULES, "")
-		.split("/")
-		.slice(0, 4)
-		.join("/");
+	const key = d.replace(SERVER_MODULES, "").split("/").slice(0, 4).join("/");
 	const apps = consumers[key];
 	if (apps?.filter((a: string) => a !== app).length) {
 		consumerHits[key] = apps.filter((a: string) => a !== app);
@@ -214,7 +212,13 @@ const testCounts = {
 // so a screen that survives keeps its work and a route that changed does not
 // inherit somebody else's.
 const priorElements = new Map<string, unknown[]>();
-const priorPath = join(ROOT, CFG.paths.output, app, moduleName, "01-baseline.json");
+const priorPath = join(
+	ROOT,
+	CFG.paths.output,
+	app,
+	moduleName,
+	"01-baseline.json"
+);
 if (existsSync(priorPath)) {
 	try {
 		const prior = JSON.parse(readFileSync(priorPath, "utf8"));

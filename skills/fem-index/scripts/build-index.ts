@@ -127,7 +127,8 @@ type Page = {
 // So follow what the page imports instead. Two hops is enough in practice: a
 // page imports a module's components, and those import the api client that
 // carries the binding.
-const MODULE_IMPORT_RE = /from\s+["']@[\w-]+\/modules\/([^/"']+)\/?([^"']*)["']/g;
+const MODULE_IMPORT_RE =
+	/from\s+["']@[\w-]+\/modules\/([^/"']+)\/?([^"']*)["']/g;
 // Three hops: page → component → hook or api client. That is where a screen's
 // own data lives.
 //

@@ -174,32 +174,31 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 	);
 
 	// N · the design hid columns and nobody said what happened to them.
-// The parser reads markup, not styles, so a hidden column arrives in the
-// element list looking like any other. Two were traced as new database columns
-// on cms/academic-structure before a human noticed they were never on screen.
-if (want("P4") && existsSync(join(dir, "02-new-design.json"))) {
-	const design = JSON.parse(
-		readFileSync(join(dir, "02-new-design.json"), "utf8")
-	);
-	const hiddenCols = (design.screens ?? []).flatMap(
-		(sc: { hiddenByCss?: { columnIndex: number | null }[] }) =>
-			(sc.hiddenByCss ?? []).filter((x) => x.columnIndex !== null)
-	);
-	if (hiddenCols.length > 0) {
-		const impactMd = join(dir, "04-impact.md");
-		const said =
-			existsSync(impactMd) && /hidden|not shown|off the page/i.test(
-				readFileSync(impactMd, "utf8")
-			);
-		if (!said) {
-			err(
-				`02-new-design.json reports ${hiddenCols.length} column(s) the design declares but hides, and 04-impact.md never mentions them — say which are out of scope and why, or a hidden column gets priced as work`
-			);
+	// The parser reads markup, not styles, so a hidden column arrives in the
+	// element list looking like any other. Two were traced as new database columns
+	// on cms/academic-structure before a human noticed they were never on screen.
+	if (want("P4") && existsSync(join(dir, "02-new-design.json"))) {
+		const design = JSON.parse(
+			readFileSync(join(dir, "02-new-design.json"), "utf8")
+		);
+		const hiddenCols = (design.screens ?? []).flatMap(
+			(sc: { hiddenByCss?: { columnIndex: number | null }[] }) =>
+				(sc.hiddenByCss ?? []).filter((x) => x.columnIndex !== null)
+		);
+		if (hiddenCols.length > 0) {
+			const impactMd = join(dir, "04-impact.md");
+			const said =
+				existsSync(impactMd) &&
+				/hidden|not shown|off the page/i.test(readFileSync(impactMd, "utf8"));
+			if (!said) {
+				err(
+					`02-new-design.json reports ${hiddenCols.length} column(s) the design declares but hides, and 04-impact.md never mentions them — say which are out of scope and why, or a hidden column gets priced as work`
+				);
+			}
 		}
 	}
-}
 
-// A · P3 catalogued more than P4 traced
+	// A · P3 catalogued more than P4 traced
 	if (
 		typeof doc.catalogueSize === "number" &&
 		changes.length < doc.catalogueSize
@@ -433,7 +432,9 @@ if (want("P5") || want("P6") || want("P8")) {
 if (want("P6")) {
 	const questionsAt = join(dir, "questions.md");
 	if (existsSync(questionsAt)) {
-		const blocks = readFileSync(questionsAt, "utf8").split(/^###\s+/m).slice(1);
+		const blocks = readFileSync(questionsAt, "utf8")
+			.split(/^###\s+/m)
+			.slice(1);
 		for (const block of blocks) {
 			if (!block.includes("**Mandatory**")) {
 				continue;
@@ -548,7 +549,10 @@ if (want("P8")) {
 			[/\b\w+\.(ts|tsx)\b/g, "a source file name"],
 			[/\b[a-z][a-z0-9]*_[a-z0-9_]+\b/g, "a table or column name"],
 		];
-		const half = text.slice(0, Math.max(0, text.indexOf("## Exactly what changes")));
+		const half = text.slice(
+			0,
+			Math.max(0, text.indexOf("## Exactly what changes"))
+		);
 		for (const [pattern, what] of jargon) {
 			const hit = half.match(pattern);
 			if (hit) {

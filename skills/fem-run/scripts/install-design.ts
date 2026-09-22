@@ -17,8 +17,8 @@ import {
 	copyFileSync,
 	existsSync,
 	mkdirSync,
-	readFileSync,
 	readdirSync,
+	readFileSync,
 	renameSync,
 	writeFileSync,
 } from "node:fs";
@@ -61,7 +61,9 @@ const incoming = sha(from);
 // its gates and its answered questions.
 if (existsSync(designAt) && sha(designAt) === incoming) {
 	console.log(`design   unchanged · ${moduleName}.html`);
-	console.log(`run      ${existsSync(runDir) ? "continues where it left off" : "not started yet"}`);
+	console.log(
+		`run      ${existsSync(runDir) ? "continues where it left off" : "not started yet"}`
+	);
 	process.exit(0);
 }
 
@@ -84,7 +86,9 @@ if (existsSync(runDir) && readdirSync(runDir).length > 0) {
 	if (existsSync(designAt)) {
 		renameSync(designAt, join(archive, `${moduleName}.run${n}.html`));
 	}
-	console.log(`archived previous run → ${basename(archive)}/ (with its design)`);
+	console.log(
+		`archived previous run → ${basename(archive)}/ (with its design)`
+	);
 }
 
 mkdirSync(designDir, { recursive: true });
@@ -101,6 +105,8 @@ if (existsSync(stateAt)) {
 	);
 }
 
-console.log(`design   ${basename(from)} → ${DESIGNS}/${app}/${moduleName}/${moduleName}.html`);
+console.log(
+	`design   ${basename(from)} → ${DESIGNS}/${app}/${moduleName}/${moduleName}.html`
+);
 console.log(`results  ${OUTPUT}/${app}/${moduleName}/`);
 console.log(`sha256   ${incoming.slice(0, 16)}`);
