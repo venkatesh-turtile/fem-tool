@@ -34,14 +34,12 @@ it is machinery to make this sheet defensible.
 4. **Never Reject without an alternative.** *"4.0 days of lifecycle rewrite for a
    status label — here is a display-only version for 0.5"* is a negotiation.
    *"Rejected"* is a wall.
-5. **Answer the mandatory questions before presenting anything.** §9.3 puts a
-   blocked item at ×2.0, and an item at ×2.0 cannot be bucketed honestly. So
-   before writing the sheet, ask whatever is still open — in the terminal, one
-   `AskUserQuestion` call per question, per
-   `.claude/skills/fem-shared/asking-questions.md`. Gate 2 is **refused** while a
-   mandatory question is neither answered nor explicitly left open; the
-   validator enforces it. An item whose question is deliberately left open is
-   bucketed **Defer**, never Take, and the sheet says what it is waiting on.
+5. **Bucket every item, including the open ones.** An item nobody has decided
+   is still priced as the design draws it, with the alternative's cost stated
+   beside it. Do not stop to ask: the sheet is where a decision gets made, and
+   it reaches the reader with the evidence attached. An item that genuinely
+   cannot be priced — because what it needs is stored nowhere and undecidable —
+   is bucketed **Defer** and says what it is waiting on.
    Every answer collected here goes through
    `.claude/skills/fem-shared/answer-consequences.md` before the sheet is
    written — an answer at this stage can still move an item from Take to

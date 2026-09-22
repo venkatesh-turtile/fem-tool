@@ -1,143 +1,100 @@
-# Asking the questions — the single source of truth
+# Asking — almost never. Reporting — always.
 
-Spec §8 P2 and §9.3. Every phase that raises a question reads **this file**.
+Spec §8 P2 and §9.3. Every phase that finds something it cannot settle reads
+**this file**.
 
-A question this workflow cannot answer is not a note for later. It is a decision
-the person running the workflow has to make, and an unanswered one takes that
-change's bad case to **twice** its likely case. So the workflow **asks, in the
-terminal, one question at a time**, rather than leaving a file for somebody to
-find.
+## The default is: do not ask
 
-## Rule 1 · The phase that raises a question asks it
+The workflow's job is to compare what a screen does today with what a design
+asks for, and to say what that costs. **Not to interview the person running
+it.** They gave you a design; read it.
 
-Not the next phase, not gate 2, not the report. The phase that discovered it,
-before it records itself as done.
+When a design shows something new, take it **as drawn** and write it down. A
+column is a column. A flag is a flag. If the design's sample data says
+`Maternity Leave → Female`, that is what the field holds.
 
-| Phase | Asks about |
+This was learned the hard way. Twelve questions were asked across one day's
+runs; four were answered *"take the design as drawn and put it in the
+summary"*, and several more could have been answered by reading the code — the
+answer was in the design's own comments, or in the index. Meanwhile the
+corrections that actually mattered came from a person **reading the finished
+documents**, not from being interrupted.
+
+## Ask only for a decision that is not about the design
+
+A question is warranted when answering it is a **business or policy choice**
+that the design cannot contain and the code cannot reveal:
+
+| Ask | Do not ask |
 |---|---|
-| **P2** design intake | what the design does not say — an undrawn empty state, a button with no stated effect |
-| **P3** screen map | what the comparison raises — whether the design still fits a college, a mapping that could be read two ways, a capability that looks removed |
-| **P4** impact | what tracing turns up — data stored nowhere, an option whose cost depends on an answer, a consumer that might care |
-| **P6** trade-off | anything still open, before the sheet is written |
+| "This would refuse applicants by a protected characteristic — is that the intent?" | "What does this column hold?" — the design says |
+| "Existing rows would have to be re-labelled. Is that acceptable?" | "Should this be stored?" — if the design shows it, yes |
+| "Two answers already given contradict each other." | "Is this field new?" — the schema says |
+| "This cannot be built without knowing X, and X is nowhere." | "Which of these two shapes should we use?" — recommend one and price it |
 
-A question asked three phases after it was raised has already corrupted
-everything in between: P3 catalogues a change on a guess, P4 traces the guess,
-P5 prices the guess. Asking costs one exchange.
+Everything else is a **line in the report**, not a stop.
 
-## Rule 2 · Every kind of question goes through the terminal
+## What to do instead of asking
 
-Mandatory, optional, a factual check at a gate, a choice between two readings of
-a drawing — all of them, with `AskUserQuestion`. Never present a question as
-prose the person is expected to answer in prose, and never write one into a file
-without also asking it.
+Write it into the documents the reader already opens:
 
-| | Means | If not answered |
-|---|---|---|
-| **Mandatory** | at least one change item is blocked on it, **or** the answer changes what gets built rather than how it looks | gate 2 is refused |
-| **Optional** | the answer changes wording, ordering or a default | recorded as open, the run continues |
+- **`SUMMARY.md`** — the new thing, in plain words, in the API-and-database
+  table: what it is, where it is kept, an example from the design's own data,
+  and whether anything new has to be stored.
+- **`REPORT.md`** — for every new key: which API routes carry it, which schema
+  objects gain it, which handlers must select it, which Zod validation changes,
+  and which screens need an input. `column-ripple.ts` produces that.
+- **The appendix** — anything a person still has to decide, as a named item
+  under *Newly required*, with what it would cost if decided either way.
 
-Deciding is not a judgement call: if a change item carries
-`impact.LN.blockedOnQuestion`, the question is mandatory. Otherwise ask whether
-two answers would produce different code. If yes, mandatory.
+A decision recorded in the report reaches the same person, at the moment they
+are deciding, with the evidence beside it. A decision extracted mid-run
+interrupts the analysis to get an answer that is usually "as drawn".
 
-Optional questions are asked too — they are cheap, and an answer now is better
-than a paragraph in a report nobody acts on. Offer **"Skip for now"** on those,
-and move on the moment it is chosen.
+## When you do ask
 
-## Rule 3 · How to ask
-
-One `AskUserQuestion` call per question, so the person can think about one thing
-and move on:
-
-- `header` — three or four words: "Year window", "Event types"
-- `question` — what the screen does, never what the code does. Include the
-  number that makes it real: *"42 of 55 events would become unreachable"*
-- `options` — the lettered choices from `questions.md`, the one you would
-  recommend first and marked "(Recommended)", each with its consequence in the
-  `description`
-- last option — **"Leave it open"** (mandatory) or **"Skip for now"** (optional),
-  with the consequence stated
-
-Ask them in the order they cost money — the largest P50 first, so if someone
-stops halfway the expensive decisions are the ones that got made.
-
-### Their own answer always wins
-
-`AskUserQuestion` offers **"Other"** on every question, and that is not a
-fallback — it is the most valuable answer this workflow can get. The options are
-our guesses; the person answering runs the business and knows things the code
-does not.
-
-Never imply the choices are exhaustive, never re-ask because the answer did not
-fit a letter, and never round their words to the nearest option. Record what
-they actually said:
+One `AskUserQuestion` call, one question, lettered options from the report,
+their own answer welcome. Then record it:
 
 ```bash
-bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q2 \
-  --own "one row per class, but only for exams" "<who>"
+bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q1 b "<who>"
 ```
 
-It is filed as **Answer (their own)** and counts as answered exactly like a
-lettered choice. If their answer implies work none of the options priced, that is
-a new trace and a new number — say so rather than reusing the old one.
+The answer goes into `questions.md` and `state.json`, so a resumed run does not
+ask again — and then re-check it, per
+`.claude/skills/fem-shared/answer-consequences.md`. An answer can kill a cheaper
+option or contradict an earlier one, and that re-check is where the two
+genuinely valuable answers of that first day came from.
 
-**An answer that is really a question** — *"if nothing is selected everyone sees
-it, correct?"* — is answered with evidence from the code, and then the original
-question is asked again, reworded to include what was just established. That
-exchange is the workflow working, not a detour.
+**No question blocks a gate.** An open point is reported, priced with its
+uncertainty, and the run continues.
 
-## Rule 4 · Record every answer
+## `questions.md`
 
-```bash
-bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q3 b "<who>"
-bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q4 --open "<who>"
-```
-
-The script writes it into `questions.md` under that question, stamps who and
-when, and mirrors it into `state.json` so a resumed run asks only what is still
-open. It prints the change items that named the question, because an answer is
-not a re-trace.
-
-## Rule 5 · Every answer is re-checked before the run moves on
-
-An answer can break something that was sound before it. Two answers that are
-each reasonable can be impossible together. And an answer can raise a question
-nobody has asked yet.
-
-So every answer is followed by the check in
-`.claude/skills/fem-shared/answer-consequences.md`, which loops: re-check, ask
-what it turns up, re-check again, until a pass finds nothing new. **The phase
-does not record itself as done until that loop is quiet.**
-
-## The shape in `questions.md`
+Still written, still numbered, still in plain words — but it is now a record of
+what was noticed rather than a form to fill in:
 
 ```markdown
-### Q2 · What should "+ Add academic year" create? — **Mandatory**
+### Q2 · The gender category could restrict who may apply — **Decision**
 
-The design has a button to add a year, and does not say what a new one contains.
+As drawn it is a column: All, Female or Male, shown beside the leave type.
+Nothing refuses anyone.
 
-- **a)** An empty year — the school fills it in
-- **b)** A copy of last year's holidays and exams, which they then edit
-- **c)** Nothing yet — hide the button until we decide
+As a rule it would refuse applicants, which means a check when a request is
+made and a protected characteristic in a refusal path. That is a policy
+question before it is an engineering one. **+2 days.**
 
-**Answer (b):** a copy of last year, which they then edit.
-*someone@example.com · 2026-09-21*
+*Reported, not blocking. Priced as a column, because that is what the design
+draws.*
 ```
 
-An unanswered mandatory question carries `**Mandatory**` and no answer line. One
-deliberately left open carries `**Left open:**` with the same stamp — that is an
-answer too, and it is honest about the consequence.
+## The rules that survive
 
-## The rules that make this work
-
-1. **No identifiers.** No endpoint paths, table or column names, or file names —
-   in the file or in the terminal prompt. The developer's version is in
-   `04-impact.md`.
-2. **One question per decision.** If two things can be answered separately, they
-   are two questions and two calls.
-3. **Never guess and move on.** A guess becomes a number, and a number becomes a
-   commitment.
-4. **Never ask twice.** `state.json` holds the answers; a resumed run asks only
-   what is still open.
-5. **Gate 2 is refused** while a mandatory question is neither answered nor
-   explicitly left open. The validator enforces it.
+1. **No identifiers** in anything a non-engineer reads. The developer's version
+   is `REPORT.md`.
+2. **Never guess silently.** Taking a design as drawn is not a guess — it is
+   reading. Inventing a field the design does not show is.
+3. **Never ask what the design, the schema or the index already answers.** Look
+   first. Three of one day's questions had their answers sitting in a comment
+   above the rule that raised them.
+4. **Re-check an answer** when you do get one.
