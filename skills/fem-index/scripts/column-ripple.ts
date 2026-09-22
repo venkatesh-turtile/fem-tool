@@ -107,10 +107,11 @@ if (touching.length === 0) {
 // endpoint lookup uses. A column change ripples through its own module's
 // contracts; forty other endpoints that read the table in passing do not
 // define its shape.
-const own = (table.split("/").pop() ?? table).replace(/s$/, "");
-const owners = touching.filter(
-	(e) => e.serverPath.includes(own) || e.serverPath.includes(`${own}s`)
-);
+// Punctuation removed on both sides: the table `leave-requests` is owned by
+// endpoints called `leaverequest`, and a literal match finds neither.
+const flat = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
+const own = flat((table.split("/").pop() ?? table).replace(/s$/, ""));
+const owners = touching.filter((e) => flat(e.serverPath).includes(own));
 const rest = touching.filter((e) => !owners.includes(e));
 
 // Every schema object a route file declares. These are what gain the key.
@@ -152,7 +153,7 @@ for (const e of owners) {
 	console.log(
 		`| \`${e.id}\` | \`${base}\` | ${subs.length ? subs.join(" ") : "—"} | ${ms} | ${
 			writes
-				? `accept \`${camel}\` where a subject is written, and return it on every read`
+				? `accept \`${camel}\` where a row is written, and return it on every read`
 				: `return \`${camel}\``
 		} |`
 	);
