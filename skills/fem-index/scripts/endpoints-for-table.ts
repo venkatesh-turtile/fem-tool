@@ -62,9 +62,34 @@ const writes = (e: Endpoint) =>
 // Compare with the punctuation taken out. The table is `leave-requests` and
 // the endpoints that own it are called `leaverequest` — a literal match finds
 // neither, and reports that nothing owns the table.
+// A table name and an endpoint name rarely agree on plurals: leave-policies is
+// served by leavepolicy, leave-requests by leaverequest. Try the spellings a
+// codebase actually uses rather than guessing one.
+const stems = (name: string) => {
+	const out = new Set<string>();
+	// The whole name, and its last word on its own: `leave-policies` is served
+	// by `leavepolicy`, and its response schemas are called
+	// `allPoliciesResponseSchema` — no "leave" in sight.
+	const parts = name.toLowerCase().split(/[-_]/);
+	for (const base of [name.toLowerCase(), parts.at(-1) ?? ""]) {
+		if (!base) {
+			continue;
+		}
+		out.add(base);
+		if (base.endsWith("ies")) {
+			out.add(`${base.slice(0, -3)}y`);
+		}
+		if (base.endsWith("s")) {
+			out.add(base.slice(0, -1));
+		}
+		out.add(`${base}s`);
+	}
+	return [...out]
+		.map((v) => v.replace(/[^a-z0-9]/g, ""))
+		.filter((v) => v.length > 3);
+};
 const flat = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
-const own = (table.split("/").pop() ?? table).replace(/s$/, "");
-const words = [own, `${own}s`].filter((w) => w.length > 2).map(flat);
+const words = stems(table.split("/").pop() ?? table);
 const affinity = (e: Endpoint) => {
 	const path = flat(e.serverPath);
 	return words.filter((w) => path.includes(w)).length;

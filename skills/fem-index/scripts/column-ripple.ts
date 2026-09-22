@@ -34,11 +34,6 @@ if (!(table && key)) {
 }
 // snake_case in the database, camelCase in the contracts.
 const camel = key.replace(/_([a-z])/g, (_m, c) => c.toUpperCase());
-// "cms/academic/subjects" → "Subject": the word a schema object is named after.
-const Entity = ((table.split("/").pop() ?? table).replace(/s$/, "") || "")
-	.split(/[-_]/)
-	.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-	.join("");
 
 type Endpoint = {
 	id: string;
@@ -77,6 +72,15 @@ const urlOf = (serverPath: string) =>
 const screensUsing = (
 	clientFile: string
 ): { routes: string[]; direct: boolean } => {
+	// A page that imports a schema itself is not "reached by" a page — it IS
+	// one. Without this its own route is reported as unreachable, which reads
+	// as dead code.
+	const itself = pages
+		.filter((pg) => pg.file === clientFile)
+		.map((pg) => pg.route);
+	if (itself.length > 0) {
+		return { routes: [...new Set(itself)], direct: true };
+	}
 	const direct = pages
 		.filter((pg) => (pg.usesFiles ?? []).includes(clientFile))
 		.map((pg) => pg.route);
@@ -109,13 +113,57 @@ if (touching.length === 0) {
 // define its shape.
 // Punctuation removed on both sides: the table `leave-requests` is owned by
 // endpoints called `leaverequest`, and a literal match finds neither.
+// A table name and an endpoint name rarely agree on plurals: leave-policies is
+// served by leavepolicy, leave-requests by leaverequest. Try the spellings a
+// codebase actually uses rather than guessing one.
+const stems = (name: string) => {
+	const out = new Set<string>();
+	// The whole name, and its last word on its own: `leave-policies` is served
+	// by `leavepolicy`, and its response schemas are called
+	// `allPoliciesResponseSchema` — no "leave" in sight.
+	const parts = name.toLowerCase().split(/[-_]/);
+	for (const base of [name.toLowerCase(), parts.at(-1) ?? ""]) {
+		if (!base) {
+			continue;
+		}
+		out.add(base);
+		if (base.endsWith("ies")) {
+			out.add(`${base.slice(0, -3)}y`);
+		}
+		if (base.endsWith("s")) {
+			out.add(base.slice(0, -1));
+		}
+		out.add(`${base}s`);
+	}
+	return [...out]
+		.map((v) => v.replace(/[^a-z0-9]/g, ""))
+		.filter((v) => v.length > 3);
+};
 const flat = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
-const own = flat((table.split("/").pop() ?? table).replace(/s$/, ""));
-const owners = touching.filter((e) => flat(e.serverPath).includes(own));
+const wanted = stems(table.split("/").pop() ?? table);
+const owners = touching.filter((e) =>
+	wanted.some((w) => flat(e.serverPath).includes(w))
+);
 const rest = touching.filter((e) => !owners.includes(e));
 
 // Every schema object a route file declares. These are what gain the key.
 const schemasIn = (file: string): string[] => {
+	// Two conventions live in this codebase. The suffixed one keeps its schema
+	// objects in the same file as its routes; the plural one keeps them next
+	// door in schema.ts. Reading only the route file returned nothing for the
+	// second kind, and an empty list reads as "nothing to change here".
+	const candidates = [file];
+	const dir = file.replace(/\/[^/]*$/, "");
+	for (const sibling of ["schema.ts", "schemas.ts"]) {
+		const at = join(ROOT, dir, sibling);
+		if (existsSync(at) && !candidates.includes(`${dir}/${sibling}`)) {
+			candidates.push(`${dir}/${sibling}`);
+		}
+	}
+	return candidates.flatMap((f) => schemaObjectsIn(f));
+};
+
+const schemaObjectsIn = (file: string): string[] => {
 	const at = join(ROOT, file);
 	if (!existsSync(at)) {
 		return [];
@@ -164,11 +212,30 @@ console.log("| Schema object | Kind | Add the key? | File |");
 console.log("|---|---|---|---|");
 for (const e of owners) {
 	const objs = e.routeFile ? schemasIn(e.routeFile) : [];
+	// Remember where each one was declared, so the table points at the file a
+	// developer actually has to open.
+	const fileOf = new Map<string, string>();
+	if (e.routeFile) {
+		const dir = e.routeFile.replace(/\/[^/]*$/, "");
+		for (const f of [e.routeFile, `${dir}/schema.ts`, `${dir}/schemas.ts`]) {
+			for (const o of schemaObjectsIn(f)) {
+				if (!fileOf.has(o)) {
+					fileOf.set(o, f);
+				}
+			}
+		}
+	}
 	for (const o of objs) {
 		// A schema file holds more than the entity: a syllabus item, a path
 		// node, an import error. Saying all of them gain the key is worse than
 		// saying nothing — a developer would go and add it to each.
-		if (!o.includes(Entity)) {
+		// Schema objects are named after the entity in whatever spelling the
+		// module chose — `SubjectSchema`, `leavePolicyCreateSchema`,
+		// `allPoliciesResponseSchema`. Match the way the endpoint lookup does,
+		// case and plural insensitive, or a whole section comes back empty and
+		// reads as "nothing to change here".
+		const lower = o.toLowerCase();
+		if (!wanted.some((w) => lower.includes(w))) {
 			continue;
 		}
 		// `SubjectTypeSchema` is an enum of values, not the row. A schema named
@@ -176,6 +243,12 @@ for (const e of owners) {
 		if (/^\w*Type(Schema)?$|^\w*StatusSchema$/.test(o)) {
 			continue;
 		}
+		// Named after the entity, but not the entity: route parameters, and the
+		// responses that report an action rather than return the row.
+		if (/Params?(Schema)?$/i.test(o)) {
+			continue;
+		}
+		const aboutAnAction = /deletion|delete|assignment|unassign/i.test(o);
 		const kind = /Response/.test(o)
 			? "response"
 			: /Request/.test(o)
@@ -184,9 +257,10 @@ for (const e of owners) {
 					? "query"
 					: "the entity";
 		const verdict =
-			// A delete response says what happened, not what the row held.
-			/^Delete/.test(o) && kind === "response"
-				? "no — a delete response carries no row"
+			// A response that reports an action says what happened, not what the
+			// row held: a deletion, an assignment, an unassignment.
+			aboutAnAction && kind === "response"
+				? "no — it reports what happened, and carries no row"
 				: kind === "response"
 					? "**yes** — so the screen can read it back"
 					: kind === "request"
@@ -195,7 +269,7 @@ for (const e of owners) {
 							? "only if the screen filters by it"
 							: "**yes** — this is the row itself";
 		console.log(
-			`| \`${o}\` | ${kind} | ${verdict} | \`${e.routeFile?.split("modules/").pop() ?? "—"}\` |`
+			`| \`${o}\` | ${kind} | ${verdict} | \`${(fileOf.get(o) ?? e.routeFile ?? "—").split("modules/").pop()}\` |`
 		);
 	}
 }
