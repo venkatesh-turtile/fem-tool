@@ -329,14 +329,15 @@ calls nothing.
 
 ## 5 · P2 · design intake — the blocked step
 
-Parses the new HTML into the same screen spec, raises **ambiguity questions**
-rather than guessing, and SHA-256s each file into `state.json` so a design update
-re-runs only what it touched.
+Parses the new HTML into the same screen spec, records **what it could not
+settle** rather than guessing, and SHA-256s each file into `state.json` so a
+design update re-runs only what it touched.
 
-The questions are not filed away: P2 **asks them in the terminal**, with options,
-before it records itself as done — as does every later phase for its own
-questions. See `fem-shared/asking-questions.md`, and
-`fem-shared/answer-consequences.md` for the re-check that follows every answer.
+P2 **does not ask**, and neither does any later phase. What it cannot settle is
+priced as the design draws it, with the alternative's cost beside it, in
+`questions.md` and in the summary's appendix. See
+`fem-shared/asking-questions.md`, and `fem-shared/answer-consequences.md` for
+the re-check that follows an answer if one ever arrives.
 
 > ⚠ **This does not work yet.** The designs shipped so far are precompiled React
 > — 1.3 MB with **1,826 `createElement` calls and zero `<table>`, `<th>`,

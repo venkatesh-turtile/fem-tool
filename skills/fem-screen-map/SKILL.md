@@ -67,36 +67,24 @@ nothing was invented. The taxonomy tags below the list are for the phases that
 follow, and a developer should check those; the plain list is what makes the
 gate answerable by anyone.
 
-## Ask what the comparison raised — before gate 1
+## Record what the comparison raised — before gate 1
 
-P3 is the first phase that can see old and new together, so it is the first that
-can ask a question worth asking: does this design still fit a college, is a
-capability actually removed or only moved, is a screen a replacement or a split.
+P3 is the first phase that can see old and new together, so it is the first
+that can notice the things worth noticing: whether the design still fits a
+college, whether a capability is actually removed or only moved, whether a
+screen is a replacement or a split.
 
-**Record them here, not at P4.** Take the design as drawn; a difference the
-comparison raises is a line in the change catalogue, not a question. Ask only
-for a decision that is not about the design — see
-`.claude/skills/fem-shared/asking-questions.md`. One `AskUserQuestion` call per question, options
-plus "Leave it open", the person's own answer welcome — the convention is
+**Write them down here, not at P4, and do not ask about any of them.** A
+difference the comparison raises is a line in the change catalogue. A choice it
+raises is a numbered entry in `questions.md` and a named decision in the
+appendix, priced both ways. See
 `.claude/skills/fem-shared/asking-questions.md`.
 
-The college question in particular is asked, not merely written down: it decides
-which customers can use the screen, and nobody reads that decision out of a
-prose paragraph in time to change it.
+The college question in particular goes in the catalogue **and** the summary,
+because it decides which customers can use the screen — the config says which
+kind is in scope, and the design's own variant markers say which parts belong
+to which kind. Both are readable. Neither needs a person.
 
-```bash
-bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q1 a "<who>"
-```
-
-Then re-check per `.claude/skills/fem-shared/answer-consequences.md`: an answer
-here can change the change catalogue itself — a capability confirmed as "kept"
-stops being an R1, a design confirmed school-only becomes its own item.
-
-## Gate 1
-
-Present to the developer:
-
-```
 screens   N mapped 1:1 · N split · N merged · N new · N removed
 changes   N total — V0 n · V1 n · D1 n · D2 n · A1 n · A2 n · R1 n
 ```
