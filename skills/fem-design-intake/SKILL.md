@@ -107,55 +107,58 @@ so each entry is written for them, not for the developer:
    carry a single academic_node_id".
 2. **Say what it changes for a school**, in one clause: what they gain, lose, or
    cannot do until it is settled.
-3. **Offer the choices**, each with its consequence, so the answer is a pick
-   rather than an essay:
+3. **Lay out the choices with their prices**, and say which one you priced, so
+   somebody reading it can disagree in one sentence:
 
 ```markdown
-### Q2 · An event that covers several classes — **Mandatory**
+### Q2 · An event that covers several classes — **Decision**
 
 Today an event belongs to one class, and the new screen lets one event name
 several.
 
-- **a)** Save it as one event per class and show them as one row — quickest, and
-  nothing changes underneath
-- **b)** Build it properly so one event holds many classes — tidier, a few days more
-- **c)** Keep one class per event and drop the multi-select from the design
+- **a)** Save it as one event per class and show them as one row — quickest,
+  nothing changes underneath. **+0.5 days.**
+- **b)** Build it properly so one event holds many classes — tidier, and it
+  survives the next screen that needs it. **+3 days.**
+- **c)** Keep one class per event and drop the multi-select from the design.
+  **0 days**, and the design loses a control.
+
+*Priced as (a), because that is the smallest thing that draws what the design
+draws. (b) is the one to take if events are about to get more complicated.*
 ```
 
 4. **No identifiers.** No endpoint paths, table or column names, or file names.
    If the developer needs them, they are in `04-impact.md`.
 5. **One question per decision.** If two things can be answered separately, they
    are two questions.
-6. **Number every question as its own `### Qn ·` heading** and mark it
-   **Mandatory** or **Optional**. An answer is filed under its heading, so a
-   question without one cannot be answered.
+6. **Number every entry as its own `### Qn ·` heading**, and end it by saying
+   which way you priced it and why. An answer, if one ever arrives, is filed
+   under that heading — so every entry needs one.
 
-Later phases append to this file in the same style. An unanswered question
-doubles the bad-case estimate for every item that depends on it, so a question
-nobody can understand is a question nobody answers — and the estimate stays
-wide for the wrong reason.
+Later phases append to this file in the same style. Nothing here is marked
+mandatory, because nothing here is asked: an entry is a thing noticed and
+priced as drawn, with the alternative's cost beside it.
 
-## Ask them — do not leave a file and hope
+## Write them down — do not ask anybody
 
-**Do not ask them.** Take the design as drawn and record what it shows.
-`questions.md` is a record of what was noticed, not a form to fill in — see
-`.claude/skills/fem-shared/asking-questions.md`. Ask only when answering is a
-business or policy choice the design cannot contain and the code cannot reveal;
-everything else, with `AskUserQuestion`: one call per question, the
-lettered choices as the options, "Leave it open" always available, and the
-person's own answer — the built-in "Other" — treated as the best answer of all.
+**Do not ask.** Take the design as drawn and record what it shows.
+`questions.md` is a record of what was noticed, not a form for somebody to fill
+in, and nothing in it blocks a phase or a gate. See
+`.claude/skills/fem-shared/asking-questions.md` for what to write instead, and
+where each kind of uncertainty lands — the summary's table, the report's
+per-key ripple, or the appendix as a priced decision.
 
-The convention is `.claude/skills/fem-shared/asking-questions.md`: which
-questions are mandatory, how to phrase the call, what order to ask in, and how
-an answer is recorded. Read it before asking.
+Before you write an entry down, look for the answer: the design's own comments,
+the module's schema, and the index you just built answer most of them. Three of
+one day's twelve questions had their answer in a comment directly above the
+rule that raised them.
 
-Record each answer as it arrives:
+If somebody records an answer later, after reading the report:
 
 ```bash
 bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q2 a "<who>"
-bun .claude/skills/fem-run/scripts/record-answer.ts <app> <module> Q2 \
-  --own "one row per class, but only for exams" "<who>"
 ```
+
 
 A resumed run reads `state.json` and asks only what is still open, so nobody is
 asked the same thing twice. Optional questions offer "Skip for now" and the run

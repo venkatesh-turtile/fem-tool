@@ -135,15 +135,17 @@ happens.
    the change catalogue, not a fresh one — decisions survive (NFR-3).
 4. **Never write outside `docs/fe-migration/`** (NFR-1).
 5. **Quote the index ref** with any number you report.
-6. **Do not interview the person running it.** Take the design as drawn and
-   report what it shows. A question is warranted only when answering it is a
-   business or policy choice the design cannot contain and the code cannot
-   reveal — see `.claude/skills/fem-shared/asking-questions.md`. Everything else
-   is a line in the report, priced both ways.
-7. **Re-check any answer you do get.** It can kill a cheaper option or
-   contradict an earlier one — `.claude/skills/fem-shared/answer-consequences.md`.
-8. **No question blocks a gate.** An open point is reported, priced with its
-   uncertainty, and the run continues.
+6. **Never ask the person running it a question.** Not at any phase, not at a
+   gate. Take the design as drawn, compare it with what the screen does today,
+   and write down what is different and what it costs. Every uncertainty is a
+   line in the report or a priced decision in the appendix —
+   `.claude/skills/fem-shared/asking-questions.md` says which goes where.
+7. **Re-check any answer that does arrive** — somebody reading the report and
+   recording one. It can kill a cheaper option or contradict an earlier one:
+   `.claude/skills/fem-shared/answer-consequences.md`. Re-trace and re-price
+   whatever moved.
+8. **Nothing blocks a gate but the gate.** The two gates are the only places a
+   person is waited on, and they are approvals, not interviews.
 
 ## Time
 

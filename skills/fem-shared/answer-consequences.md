@@ -11,7 +11,7 @@ nobody had been asked about — which then saved 2.2 days.
 ## The loop
 
 ```
-ask  →  record  →  RE-CHECK  →  new question?  ──yes──→  ask it
+answer arrives  →  record  →  RE-CHECK  →  something moved?  ──yes──→  write it down
                        │                                     │
                        └──────────── no ─────────────────────┘
                                      │
@@ -88,7 +88,7 @@ answer just made pointless.
 | An item still blocked on a question that has been answered | error — the answer never reached the trace |
 | A trace older than the newest answer | error — re-trace, then re-estimate |
 | Answers recorded but no "What the answers changed" section | error — say what moved and why |
-| A mandatory question unanswered at gate 2 | error — ask it |
+| An entry in `questions.md` nobody has answered | fine — it is priced both ways in the appendix |
 
 These four exist because every one of them happened by hand before it was
 automated.

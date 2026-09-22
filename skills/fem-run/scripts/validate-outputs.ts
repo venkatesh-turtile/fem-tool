@@ -527,31 +527,11 @@ if (want("P5") || want("P6") || want("P8")) {
 	}
 }
 
-// G · a mandatory question reached gate 2 with nobody having answered it.
-// The whole point of asking in the terminal is that this can no longer happen
-// by drift: an item blocked on an unanswered question is priced at x2.0, and a
-// sheet built on x2.0 numbers reads as a decision when it is a shrug.
-if (want("P6")) {
-	const questionsAt = join(dir, "questions.md");
-	if (existsSync(questionsAt)) {
-		const blocks = readFileSync(questionsAt, "utf8")
-			.split(/^###\s+/m)
-			.slice(1);
-		for (const block of blocks) {
-			if (!block.includes("**Mandatory**")) {
-				continue;
-			}
-			const answered =
-				block.includes("**Answer") || block.includes("**Left open:**");
-			if (!answered) {
-				const title = (block.split("\n")[0] ?? "").trim();
-				err(
-					`questions.md: "${title}" is mandatory and unanswered — ask it in the terminal and record it with record-answer.ts, or record it as left open. Gate 2 cannot be presented on a guess`
-				);
-			}
-		}
-	}
-}
+// G was removed. It refused a decisions sheet while a question sat unanswered,
+// which only makes sense if the workflow's job is to extract answers. It is
+// not. The job is to compare a design with what exists and price the
+// difference, and an open point belongs in the sheet with what it costs either
+// way — not in a error that stops the sheet being written.
 
 if (want("P8")) {
 	const reportAt = join(dir, "REPORT.md");

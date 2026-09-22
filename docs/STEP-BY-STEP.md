@@ -94,11 +94,12 @@ something unclear. Later phases add to it whenever they hit something they
 cannot answer. That is why its time in this run is 16:26, after P5, and not
 15:56 when P2 ran.
 
-**You are asked, not emailed.** Each phase asks its own questions in the
-terminal, with options, before it records itself as done — P2 the design's, P3
-the comparison's, P4 what tracing turned up, P6 whatever is left. You pick an
-option, type your own answer, or leave it open. The file is the record of what
-was asked and what you said, not a to-do list.
+**You are never asked.** Each phase writes down what it could not settle — P2
+the design's, P3 the comparison's, P4 what tracing turned up, P6 whatever is
+left — and prices it as the design draws it, with the alternative's cost beside
+it. The file is a record of what was noticed, not a to-do list and not a form.
+If you disagree with how something was priced, say so; it is one sentence,
+because the other number is already there.
 
 **Each file feeds the next phase:**
 
@@ -266,10 +267,11 @@ Each difference gets an id and a type:
 
 **You reply:** `approved`, or give corrections.
 
-**P3 asks its own questions before this gate** — whether the design still fits
-a college, whether a capability is really removed or only moved. Answer them in
-the terminal as they come; each one is a pick, and your own answer is always
-allowed.
+**P3 writes down what the comparison raised before this gate** — whether the
+design still fits a college, whether a capability is really removed or only
+moved. It does not ask; it reads the config and the design's variant markers,
+records what it found, and prices it. Correct it at the gate if it read it
+wrong.
 
 **Next:** P4.
 

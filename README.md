@@ -107,7 +107,7 @@ printf '.claude/skills/fem-*\nfem.config.json\n' >> .git/info/exclude
 ```
 
 Nothing else to prepare — no index to build, no folders to create, no design to
-file by hand. The run does all of it, and asks you whatever it cannot decide.
+file by hand. The run does all of it, and asks you nothing.
 
 ## Use
 
@@ -117,9 +117,9 @@ In Claude Code, point it at the design wherever it happens to be:
 /fem-run cms academic-calendar ~/Downloads/Academic_Calendar_v4.html
 ```
 
-Then answer what it asks and approve the two gates. It asks in the terminal, one
-question at a time, with options — and your own answer is always welcome. That
-is the whole thing.
+Then approve the two gates. That is the whole thing — it will not ask you
+anything else, and everything it could not settle is written into the documents
+it hands you, priced both ways.
 
 The run files the design under its module, creates the results folder, and — if
 a run already exists for an older design — archives that run and its design
@@ -170,7 +170,7 @@ docs/fe-migration/<app>/<module>/
   06-decisions.md   options and costs, for UX
   REPORT.md         evidence for every claim, for engineering
   07-plan.md        build order
-  questions.md      every question, with the answer you gave and when
+  questions.md      everything it could not settle, priced both ways
   04-impact.md      the twelve-layer trace
   05-estimate.*     the numbers, per change and per layer
 ```
@@ -229,19 +229,18 @@ tomorrow. Change the design and re-run: the file's hash is stored, the phases
 after it are invalidated, and you see a **diff** of the change list rather than
 a fresh one — earlier decisions survive.
 
-**It does not interview you.** It takes the design as drawn, compares it with
-what the screen does today, and writes down what it finds. A column the design
-shows is a column; a rule it does not draw is not one.
+**It never asks you a question.** It takes the design as drawn, compares it
+with what the screen does today, and writes down what it finds. A column the
+design shows is a column; a rule it does not draw is not one.
 
-Anything still to be decided is reported rather than asked: named in the
-summary's appendix, priced both ways in the decisions sheet, and traced in the
-report with the evidence beside it. You decide when you read it, which is when
-you were going to decide anyway.
+Anything still to be decided is reported instead: named in the summary's
+appendix, priced both ways in the decisions sheet, and traced in the report with
+the evidence beside it, with a line saying which way it was priced and why. You
+decide when you read it, which is when you were going to decide anyway — and you
+can disagree in one sentence, because the alternative already has a number.
 
-It asks only when answering is a business or policy choice the design cannot
-contain and the code cannot reveal — a protected characteristic in a refusal
-path, existing rows that would have to be re-labelled, two decisions that
-contradict each other. **No question blocks a gate.**
+The two gates are the only places you are waited on, and they are approvals,
+not interviews.
 
 ## Docs
 

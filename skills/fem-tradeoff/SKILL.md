@@ -36,7 +36,7 @@ it is machinery to make this sheet defensible.
    *"Rejected"* is a wall.
 5. **Bucket every item, including the open ones.** An item nobody has decided
    is still priced as the design draws it, with the alternative's cost stated
-   beside it. Do not stop to ask: the sheet is where a decision gets made, and
+   beside it. Never stop to ask: the sheet is where a decision gets made, and
    it reaches the reader with the evidence attached. An item that genuinely
    cannot be priced — because what it needs is stored nowhere and undecidable —
    is bucketed **Defer** and says what it is waiting on.
