@@ -19,11 +19,17 @@ const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
 const SCHEMA_DIR = join(import.meta.dir, "..", "..", "fem-shared", "schemas");
 const [app, moduleName, onlyPhase] = process.argv.slice(2);
+
+// A module may be a route prefix — "hrms/admin/leaves" — so that a design
+// covering one part of a large module can be analysed on its own. Folders are
+// named flat, so a run is one directory and the archive numbering keeps
+// working.
+const moduleDir = moduleName.replace(/\//g, "-");
 if (!(app && moduleName)) {
 	console.error("usage: validate-outputs.ts <app> <module> [P1|P2|P4|P5]");
 	process.exit(2);
 }
-const dir = join(ROOT, CFG.paths.output, app, moduleName);
+const dir = join(ROOT, CFG.paths.output, app, moduleDir);
 
 const errors: string[] = [];
 const warnings: string[] = [];

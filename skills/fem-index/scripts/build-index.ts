@@ -117,6 +117,7 @@ type Page = {
 	module: string | null;
 	usesModules: string[];
 	usesFiles: string[];
+	usesFilesNear: string[];
 };
 
 // A route and the folder its code lives in are two different things. The CMS
@@ -150,8 +151,13 @@ const HOPS = 3;
 function reachedFrom(
 	pageFile: string,
 	modRoot: string
-): { files: string[]; modules: string[] } {
+): { files: string[]; near: string[]; modules: string[] } {
 	const seen = new Set<string>();
+	// How far each file sits from the page. A screen that imports one shared
+	// hooks file inherits everything that file imports — one library screen
+	// reached 39 endpoints that way. Distance is what tells a screen's own data
+	// from its neighbours'.
+	const hops = new Map<string, number>();
 	const mods = new Set<string>();
 	let frontier = [pageFile];
 	for (let depth = 0; depth < HOPS && frontier.length > 0; depth++) {
@@ -161,6 +167,9 @@ function reachedFrom(
 				continue;
 			}
 			seen.add(f);
+			if (!hops.has(f)) {
+				hops.set(f, depth);
+			}
 			const src = read(f);
 			if (!src) {
 				continue;
@@ -188,8 +197,16 @@ function reachedFrom(
 		frontier = next;
 	}
 	seen.delete(pageFile);
+	hops.delete(pageFile);
 	return {
 		files: [...seen].map(rel).sort(),
+		// One hop: the page's own imports, and what those import. Far enough to
+		// reach the api client a screen actually calls, short of the barrel that
+		// re-exports a whole module.
+		near: [...hops.entries()]
+			.filter(([, d]) => d <= 1)
+			.map(([f]) => rel(f))
+			.sort(),
 		modules: [...mods].sort(),
 	};
 }
@@ -215,7 +232,11 @@ function buildPages(): Page[] {
 				module: seg[0] ?? null,
 				...(() => {
 					const r = reachedFrom(f, join(ROOT, cfg.modules));
-					return { usesModules: r.modules, usesFiles: r.files };
+					return {
+						usesModules: r.modules,
+						usesFiles: r.files,
+						usesFilesNear: r.near,
+					};
 				})(),
 			});
 		}

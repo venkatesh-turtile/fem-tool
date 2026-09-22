@@ -23,6 +23,12 @@ import { join } from "node:path";
 const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
 const [cmd, app, moduleName, ...rest] = process.argv.slice(2);
+
+// A module may be a route prefix — "hrms/admin/leaves" — so that a design
+// covering one part of a large module can be analysed on its own. Folders are
+// named flat, so a run is one directory and the archive numbering keeps
+// working.
+const moduleDir = moduleName.replace(/\//g, "-");
 if (!(cmd && app && moduleName)) {
 	console.error(
 		"usage: run-state.ts <status|next|done|approve|rehash> <app> <module> [...]"
@@ -46,7 +52,7 @@ const PHASES = [
 	{ id: "P8", skill: "fem-report", out: "REPORT.md", gate: null },
 ] as const;
 
-const dir = join(ROOT, CFG.paths.output, app, moduleName);
+const dir = join(ROOT, CFG.paths.output, app, moduleDir);
 const statePath = join(dir, "state.json");
 mkdirSync(dir, { recursive: true });
 
@@ -72,7 +78,7 @@ const save = () =>
 	writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
 
 function hashDesigns(): Record<string, string> {
-	const d = join(ROOT, CFG.paths.designs, app, moduleName);
+	const d = join(ROOT, CFG.paths.designs, app, moduleDir);
 	if (!existsSync(d)) {
 		return {};
 	}
