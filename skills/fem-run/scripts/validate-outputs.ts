@@ -232,6 +232,33 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 				);
 			}
 		}
+		// O · a new endpoint priced without looking for the one that exists.
+		// "Save the whole structure in one press" was priced at 7.4 days — a
+		// third of its module — against an endpoint that already took the whole
+		// structure, ordered it by depth and wrote it in a transaction, and was
+		// already being called by the screen next door. Nothing had required
+		// anyone to look.
+		const NEW_ENDPOINT_KEYS = [
+			"new_mutation_endpoint",
+			"new_read_endpoint_paginated",
+		];
+		for (const L of LAYERS) {
+			const layer = impact[L];
+			const prices = ((layer?.rubric as string[]) ?? []).some((k) =>
+				NEW_ENDPOINT_KEYS.includes(k)
+			);
+			if (!prices) {
+				continue;
+			}
+			const looked =
+				((layer?.searchedEndpoints as string[]) ?? []).length > 0 ||
+				Boolean(layer?.searched);
+			if (!looked) {
+				err(
+					`${id} ${L}: prices a new endpoint without saying what already exists. List the endpoints that touch the same tables in "searchedEndpoints" and say why none fits — \`bun .claude/skills/fem-index/scripts/endpoints-for-table.ts <table>\``
+				);
+			}
+		}
 		// L · "nobody else uses this" written for free.
 		// A change that alters the contract, the handler or the schema can break
 		// a reader. Saying none is allowed; saying it without having looked is

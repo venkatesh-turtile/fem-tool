@@ -41,6 +41,34 @@ The phase that turns differences into backend work.
 9. **Name the rubric keys** each layer needs, in `impact.LN.rubric`, so
    `compute-estimate.ts` can price it deterministically.
 
+## Before you price a new endpoint, look for the one that exists
+
+**Rule O refuses a layer that prices a new endpoint without saying what it
+searched.** Ask the index, which already knows every endpoint, its methods and
+the tables it writes:
+
+```bash
+bun .claude/skills/fem-index/scripts/endpoints-for-table.ts cms/academic/nodes
+```
+
+It lists the endpoints that own that table first, then the ones that touch it in
+passing. Record what you considered in the layer's `searchedEndpoints`, and say
+why none of them fits.
+
+This exists because of two mistakes in one day, both in signed-off documents:
+
+- *"save the whole structure in one press"* was priced at **7.4 days**, a third
+  of its module. `academic-nodes/bulk-import` already took the whole structure,
+  ordered it by depth and wrote it in a transaction — and the screen next door
+  was already calling it. Real cost once found: **2.5 days**.
+- *"somewhere to keep the academic year"* was priced as a new endpoint.
+  `PUT /institutions/{id}/config` already writes the settings blob the
+  calendar's own event types live in. Real cost: **none**.
+
+Between them, **nine days of work that already existed**. The search takes
+seconds; comparing a design against the screen and forgetting to compare it
+against the API is the easiest mistake in this workflow to make.
+
 ## Institution shape — settled once, in the config
 
 `fem.config.json` names the kinds of institution **this repo** analyses, under
