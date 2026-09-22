@@ -130,6 +130,10 @@ type Page = {
 // carries the binding.
 const MODULE_IMPORT_RE =
 	/from\s+["']@[\w-]+\/modules\/([^/"']+)\/?([^"']*)["']/g;
+const APP_IMPORT_RE = /from\s+["']@[\w-]+\/app\/([^"']+)["']/g;
+// `@cms/app/...` resolves under the app's own root — the route base minus its
+// last segment ("apps/cms/app" → "apps/cms").
+let APP_ROOT_FOR_REACH = ROOT;
 // Three hops: page → component → hook or api client. That is where a screen's
 // own data lives.
 //
@@ -173,6 +177,23 @@ function reachedFrom(
 			const src = read(f);
 			if (!src) {
 				continue;
+			}
+			// A page importing `@cms/app/[institutionId]/hrms/components/leave-table`
+			// is reaching its own colocated component. Without this the chain
+			// stops at the page and everything those components bind to is lost.
+			for (const m of src.matchAll(APP_IMPORT_RE)) {
+				const stem = join(APP_ROOT_FOR_REACH, "app", m[1] ?? "");
+				for (const candidate of [
+					`${stem}.ts`,
+					`${stem}.tsx`,
+					join(stem, "index.ts"),
+					join(stem, "index.tsx"),
+				]) {
+					if (existsSync(candidate)) {
+						next.push(candidate);
+						break;
+					}
+				}
 			}
 			for (const m of src.matchAll(MODULE_IMPORT_RE)) {
 				const mod = m[1];
@@ -231,6 +252,7 @@ function buildPages(): Page[] {
 				file: rel(f),
 				module: seg[0] ?? null,
 				...(() => {
+					APP_ROOT_FOR_REACH = join(ROOT, cfg.routeBase, "..");
 					const r = reachedFrom(f, join(ROOT, cfg.modules));
 					return {
 						usesModules: r.modules,
@@ -267,8 +289,19 @@ function buildBindings(): Binding[] {
 		if (ONLY_APP && app !== ONLY_APP) {
 			continue;
 		}
+		// Both places a component can live. A codebase does not put every
+		// screen's code under modules/: HRMS keeps its leave tables and policy
+		// modals beside the routes, and 56 files under app/ import server
+		// schemas. Indexing only modules/ made those bindings — and the
+		// endpoints behind them — invisible, so a module's baseline could miss
+		// an endpoint its own page imports by name.
 		const modRoot = join(ROOT, cfg.modules);
-		for (const f of walk(modRoot)) {
+		const routeRoot = join(ROOT, cfg.routeBase);
+		const files = [
+			...walk(modRoot).map((f) => ({ f, root: modRoot, colocated: false })),
+			...walk(routeRoot).map((f) => ({ f, root: routeRoot, colocated: true })),
+		];
+		for (const { f, root, colocated } of files) {
 			if (!/\.tsx?$/.test(f) || /\.test\.|__tests__/.test(f)) {
 				continue;
 			}
@@ -276,7 +309,16 @@ function buildBindings(): Binding[] {
 			if (!src.includes("@server/modules")) {
 				continue;
 			}
-			const mod = relative(modRoot, f).split("/")[0];
+			// Under modules/ the folder names the module. Under app/ the route
+			// does, read the way pages.json reads it: the first segment that is
+			// neither a [param] nor a (group).
+			const relPath = relative(root, f);
+			const mod = colocated
+				? (relPath
+						.split("/")
+						.filter((sg) => !(sg.startsWith("[") || sg.startsWith("(")))[0] ??
+					"")
+				: relPath.split("/")[0];
 			for (const m of src.matchAll(IMPORT_RE)) {
 				out.push({
 					app,
