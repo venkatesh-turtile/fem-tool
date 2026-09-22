@@ -15,12 +15,18 @@ import { join } from "node:path";
 const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
 const [app, moduleName] = process.argv.slice(2);
+
+// A module may be a route prefix — "hrms/admin/leaves" — so that a design
+// covering one part of a large module can be analysed on its own. Folders are
+// named flat, so a run is one directory and the archive numbering keeps
+// working.
+const moduleDir = moduleName.replace(/\//g, "-");
 if (!(app && moduleName)) {
 	console.error("usage: compute-estimate.ts <app> <module>");
 	process.exit(2);
 }
 
-const dir = join(ROOT, CFG.paths.output, app, moduleName);
+const dir = join(ROOT, CFG.paths.output, app, moduleDir);
 const impact = JSON.parse(readFileSync(join(dir, "04-impact.json"), "utf8"));
 
 const mid = (v: number | number[]) =>

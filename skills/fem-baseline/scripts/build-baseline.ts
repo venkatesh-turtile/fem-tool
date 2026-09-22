@@ -15,6 +15,12 @@ const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
 // Where the server lives, so a module path can be shown without its prefix.
 const SERVER_MODULES: string = `${CFG.server.modules}/`;
 const [app, moduleName] = process.argv.slice(2);
+
+// A module may be a route prefix — "hrms/admin/leaves" — so that a design
+// covering one part of a large module can be analysed on its own. Folders are
+// named flat, so a run is one directory and the archive numbering keeps
+// working.
+const moduleDir = moduleName.replace(/\//g, "-");
 if (!(app && moduleName)) {
 	console.error("usage: build-baseline.ts <app> <module>");
 	process.exit(2);
@@ -105,12 +111,30 @@ const shortId = (v: string) =>
 // pages.json already records `module` as the first NON-DYNAMIC route segment,
 // so routes carrying [institutionId] resolve correctly and
 // /hrms/admin/timetable stays with hrms, not timetable.
+// A module may be a whole route segment — "hrms" — or a prefix inside one —
+// "hrms/admin/leaves". Large modules are several products in a trench coat,
+// and a design covering leaves should not be compared against all 47 HRMS
+// screens: a baseline that wide is how a comparison goes sloppy.
+const wanted = moduleName.split("/").filter(Boolean);
+// The parts of a route that name something, ignoring [params] and (groups).
+const named = (route: string) =>
+	route
+		.split("/")
+		.filter(Boolean)
+		.filter((sg) => !(sg.startsWith("[") || sg.startsWith("(")));
+// Anchored at the FIRST named segment, never found anywhere in the route:
+// /nexus/academic-structure is Nexus's screen, not this module's, and matching
+// loosely swept it in.
+const matchesModule = (route: string) => {
+	const parts = named(route);
+	return wanted.every((w, i) => parts[i] === w);
+};
 const screens = pagesDoc.pages
-	.filter((p) => p.app === app && p.module === moduleName)
+	.filter((p) => p.app === app && matchesModule(p.route))
 	.sort((a, b) => a.route.localeCompare(b.route));
 const segAfter = (route: string) => {
 	const seg = route.split("/").filter(Boolean);
-	const i = seg.indexOf(moduleName);
+	const i = seg.indexOf(wanted.at(-1) as string);
 	return i >= 0 ? seg.slice(i + 1).join("/") : "";
 };
 
@@ -130,8 +154,29 @@ const mine = bindings.filter(
 	(b) =>
 		b.app === app && (b.module === moduleName || reachedFiles.has(b.clientFile))
 );
+// A screen that imports one shared hooks file inherits everything that file
+// imports: a single library screen reached 39 endpoints through
+// `use-library.ts`, which nine other screens also use. True, and misleading —
+// those are the library's endpoints, not that screen's.
+//
+// A file that screens OUTSIDE this module also reach is shared. What arrives
+// only through such a file is reported apart from the module's own surface.
+// Exact, and explainable in a sentence, which a threshold never is.
+const outside = pagesDoc.pages.filter(
+	(p: Page) =>
+		p.app === app && !screens.some((sc: Page) => sc.route === p.route)
+);
+const isShared = (clientFile: string) =>
+	outside.some((p: Page) => (p.usesFiles ?? []).includes(clientFile));
+const ownBindings = mine.filter((b) => !isShared(b.clientFile));
+const viaShared = mine.filter((b) => isShared(b.clientFile));
+
 const dirOf = (serverPath: string) => serverPath.replace(/\/[^/]*$/, "");
 const endpointDirs = uniq(mine.map((b) => dirOf(b.serverPath)));
+const ownDirs = new Set(ownBindings.map((b) => dirOf(b.serverPath)));
+const sharedOnlyDirs = uniq(
+	viaShared.map((b) => dirOf(b.serverPath)).filter((d) => !ownDirs.has(d))
+);
 
 const resolvedEndpoints = endpointDirs
 	.map((d) => epByPath.get(d))
@@ -238,7 +283,7 @@ const spec = {
 	source: "repository",
 	ref: meta.ref,
 	screens: screens.map((p: Page, i: number) => ({
-		id: `S-${moduleName}-${shortId(p.route)}`,
+		id: `S-${moduleDir}-${shortId(p.route)}`,
 		name: segAfter(p.route) || moduleName,
 		route: p.route,
 		file: p.file,
@@ -246,7 +291,7 @@ const spec = {
 		// Populated by the model step — the script establishes the frame and the
 		// bindings; §8 P1 requires every element to carry a binding or be marked
 		// static. Kept across a rebuild when the screen is the same one.
-		elements: (priorElements.get(`S-${moduleName}-${shortId(p.route)}`) ??
+		elements: (priorElements.get(`S-${moduleDir}-${shortId(p.route)}`) ??
 			[]) as unknown[],
 	})),
 };
@@ -280,6 +325,10 @@ const facts = {
 		0
 	),
 	tables: uniq(resolvedEndpoints.flatMap((e) => e.tables)),
+	ownBindings: ownBindings.length,
+	endpointsOnlyViaSharedFiles: sharedOnlyDirs.map((d) =>
+		d.replace(SERVER_MODULES, "")
+	),
 	tests: testCounts,
 	consumers: consumerHits,
 	accept: {
@@ -304,7 +353,7 @@ const facts = {
 	},
 };
 
-const outDir = join(ROOT, CFG.paths.output, app, moduleName);
+const outDir = join(ROOT, CFG.paths.output, app, moduleDir);
 mkdirSync(outDir, { recursive: true });
 writeFileSync(
 	join(outDir, "01-baseline.json"),
@@ -333,10 +382,13 @@ const md = [
 	"",
 	`## Endpoints — ${facts.endpoints.resolved} of ${facts.endpoints.total} resolved (${(facts.endpoints.resolutionRate * 100).toFixed(1)}%)`,
 	"",
+	sharedOnlyDirs.length
+		? `> **${sharedOnlyDirs.length} of these arrive only through files that screens outside this\n> module also use** — a shared hooks or api file re-exporting a whole module.\n> They are this module's neighbours, not necessarily its own surface. Marked\n> \`shared\` below.\n`
+		: "> Every endpoint here is reached through files only this module's screens use.\n",
 	"```",
 	...resolvedEndpoints.map(
 		(e) =>
-			`  ${e.serverPath.replace(SERVER_MODULES, "")}\n` +
+			`  ${e.serverPath.replace(SERVER_MODULES, "")}${sharedOnlyDirs.includes(e.serverPath) ? "   ← shared" : ""}\n` +
 			`      ${e.convention} · ${e.routeCount} routes · ${e.methods.join(" ")} · ${e.tables.length} tables`
 	),
 	"```",
@@ -402,14 +454,14 @@ console.log(
 	`fem-baseline · ${app}/${moduleName} · ${meta.ref.branch}@${meta.ref.sha}`
 );
 console.log(
-	`  screens ${screens.length} · bindings ${mine.length} · endpoints ${facts.endpoints.resolved}/${facts.endpoints.total} (${(facts.endpoints.resolutionRate * 100).toFixed(1)}%) · tables ${facts.tables.length}`
+	`  screens ${screens.length} · bindings ${mine.length} (${ownBindings.length} its own) · endpoints ${facts.endpoints.resolved} (${sharedOnlyDirs.length} only via shared files) · tables ${facts.tables.length}`
 );
 const accepted =
 	facts.accept.resolutionRate.pass &&
 	facts.accept.screensFound.pass &&
 	facts.accept.bindingsFound.pass;
 console.log(
-	`  ACCEPT ${accepted ? "PASS" : "FAIL"} → ${join(CFG.paths.output, app, moduleName)}/01-baseline.md`
+	`  ACCEPT ${accepted ? "PASS" : "FAIL"} → ${join(CFG.paths.output, app, moduleDir)}/01-baseline.md`
 );
 if (!facts.accept.bindingsFound.pass && facts.accept.screensFound.pass) {
 	// Loud, and it stops the run. A baseline saying "no endpoints, no tables"

@@ -22,12 +22,18 @@ import { join } from "node:path";
 const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
 const [app, moduleName] = process.argv.slice(2);
+
+// A module may be a route prefix — "hrms/admin/leaves" — so that a design
+// covering one part of a large module can be analysed on its own. Folders are
+// named flat, so a run is one directory and the archive numbering keeps
+// working.
+const moduleDir = moduleName.replace(/\//g, "-");
 if (!(app && moduleName)) {
 	console.error("usage: parse-html.ts <app> <module>");
 	process.exit(2);
 }
 
-const srcDir = join(ROOT, CFG.paths.designs, app, moduleName);
+const srcDir = join(ROOT, CFG.paths.designs, app, moduleDir);
 if (!existsSync(srcDir)) {
 	console.error(
 		`no designs at ${CFG.paths.designs}/${app}/${moduleName}\nAsk UX to drop one HTML file per screen state there — see §14 Q1.`
@@ -304,7 +310,7 @@ files.forEach((f, i) => {
 	const p = parseability(raw);
 	// "<screen>--<state>.html"  — §14 Q1
 	const [base, state = "default"] = f.replace(/\.html$/, "").split("--");
-	const sid = `${moduleName}-${shortId(`${base}--${state}`)}`;
+	const sid = `${moduleDir}-${shortId(`${base}--${state}`)}`;
 
 	if (!p.parseable) {
 		unparseable++;
@@ -393,7 +399,7 @@ files.forEach((f, i) => {
 	});
 });
 
-const outDir = join(ROOT, CFG.paths.output, app, moduleName);
+const outDir = join(ROOT, CFG.paths.output, app, moduleDir);
 mkdirSync(outDir, { recursive: true });
 writeFileSync(
 	join(outDir, "02-new-design.json"),

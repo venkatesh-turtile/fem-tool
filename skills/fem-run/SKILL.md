@@ -28,6 +28,19 @@ The module name stays explicit because it must match the module in the
 codebase; a file called `Academic_Calendar_UI_3D 4.html` cannot tell the
 workflow that the module is `academic-calendar`.
 
+**A module may be a route prefix.** Large modules are several products sharing
+a folder, and a design covering one part of one should not be compared against
+all of it:
+
+```bash
+/fem-run cms hrms/admin/leaves ~/Downloads/HRMS_Leaves.html
+```
+
+`hrms` is 47 screens; `hrms/admin/leaves` is 6. The prefix is matched against a
+route's named segments from the first one, so `/nexus/academic-structure` is
+Nexus's screen and not academic-structure's. Output lands in one flat folder —
+`docs/fe-migration/cms/hrms-admin-leaves/`.
+
 ## P0 · the index — rebuilt on every run, not by the user
 
 **Always run this first, before P1, without being asked:**

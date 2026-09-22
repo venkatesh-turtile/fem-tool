@@ -23,22 +23,28 @@ emits for the new designs, so P3 can diff them directly.
    bun .claude/skills/fem-baseline/scripts/build-baseline.ts cms timetable
    ```
 
-2. **Check the screen list against the module owner's expectation.** This is the
+2. **Read the two numbers in the summary line.** `bindings 9 (3 its own)` means
+   six of them arrive through a file that screens outside this module also use —
+   a shared hooks or api file re-exporting a whole module. One library screen
+   reaches 39 endpoints that way, and they are the library's, not that screen's.
+   The baseline marks those endpoints `shared`; treat them as neighbours until
+   something shows otherwise.
+3. **Check the screen list against the module owner's expectation.** This is the
    §8 P1 acceptance criterion. Screens are matched on the **first non-dynamic
    route segment**, so `/[institutionId]/timetable` belongs to `timetable` and
    `/[institutionId]/hrms/admin/timetable` stays with `hrms`. If the count looks
    wrong, that is a real finding — say so rather than adjusting the filter.
 
-3. **Fill in `elements` for each screen.** The script establishes the frame and
+4. **Fill in `elements` for each screen.** The script establishes the frame and
    the bindings; you populate columns, fields, filters, actions, tabs, dialogs
    and empty/error states from the module's components. **Every element must
    carry a binding or be marked `static: true`.** An unmarked element fails
    acceptance.
 
-4. **Resolve each binding** through `_index/endpoints.json` to a server path,
+5. **Resolve each binding** through `_index/endpoints.json` to a server path,
    method and table. Cite the endpoint id.
 
-5. **Report L12 honestly, from `table-readers.json`.** `none` in
+6. **Report L12 honestly, from `table-readers.json`.** `none` in
    `consumers.json` means *no web consumer* — it sees cross-app use only where an
    app imports a server Zod schema. The list that matters is
    `_index/table-readers.json`: for each table this module touches, which server
