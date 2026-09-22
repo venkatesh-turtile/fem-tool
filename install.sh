@@ -54,7 +54,15 @@ if [ ! -e "$target/.git" ] && [ ! -e "$target/package.json" ]; then
   echo "         pass the path explicitly if that is wrong: install.sh /path/to/repo" >&2
 fi
 
+# Re-running this is how you update, so a skill deleted upstream has to go here
+# too. Copying over the top leaves the old one behind, and a stale skill is
+# worse than a missing one: it is still listed, still invoked, and still wrong.
 mkdir -p "$target/.claude/skills"
+for old in "$target"/.claude/skills/fem-*; do
+  [ -e "$old" ] || continue
+  name="$(basename "$old")"
+  [ -d "$src/skills/$name" ] || { echo "removed  → $name (gone upstream)"; rm -rf "$old"; }
+done
 cp -R "$src"/skills/fem-* "$target/.claude/skills/"
 echo "skills   → $target/.claude/skills/  ($(find "$src"/skills -maxdepth 1 -name 'fem-*' | wc -l | tr -d ' ') skills)"
 
@@ -73,12 +81,15 @@ Next:
   2. In Claude Code, from inside this repo:
        /fem-run <app> <module> ~/Downloads/<design>.html
 
-That is the whole thing. The run files the design, builds its own index and
-asks you whatever it cannot decide — there is nothing to prepare by hand.
+That is the whole thing. The run files the design, builds its own index, and
+asks you nothing — everything it cannot settle is written into the documents it
+hands you, priced both ways. There is nothing to prepare by hand.
 
 To keep the tool out of your git history:
   printf '.claude/skills/fem-*\nfem.config.json\n' >> .git/info/exclude
 
-To update later, run the same command again. Your fem.config.json is left
-alone.
+To update later, run the exact same command again. It overwrites the skills
+with the current ones and removes any that have gone upstream. Your
+fem.config.json and anything under docs/fe-migration/ are left alone, so
+finished runs survive an update.
 NEXT
