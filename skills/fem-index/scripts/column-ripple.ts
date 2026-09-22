@@ -60,6 +60,42 @@ const idx = (f: string) =>
 	JSON.parse(readFileSync(join(ROOT, CFG.paths.index, f), "utf8"));
 const { endpoints } = idx("endpoints.json") as { endpoints: Endpoint[] };
 const { bindings } = idx("frontend-bindings.json") as { bindings: Binding[] };
+const { pages } = idx("pages.json") as {
+	pages: { app: string; route: string; file: string; usesFiles?: string[] }[];
+};
+
+// apps/server/src/modules/cms/institutions/[institutionId]/…/subjects
+//   → /api/cms/institutions/{institutionId}/…/subjects
+const urlOf = (serverPath: string) =>
+	`/api/${(serverPath.split("modules/").pop() ?? serverPath).replace(
+		/\[(\w+)\]/g,
+		"{$1}"
+	)}`;
+// The screens that reach a given module file, through the import chain the
+// index already walked. This is what turns "a file changes" into "this screen
+// changes".
+const screensUsing = (
+	clientFile: string
+): { routes: string[]; direct: boolean } => {
+	const direct = pages
+		.filter((pg) => (pg.usesFiles ?? []).includes(clientFile))
+		.map((pg) => pg.route);
+	if (direct.length > 0) {
+		return { routes: [...new Set(direct)], direct: true };
+	}
+	// The index walks three hops from a page, and a dialog four levels down is
+	// still that screen's dialog. Saying "not reached from a page" reads as
+	// dead code, which is worse than saying "through this screen's module".
+	const folder = clientFile.split("/").slice(0, -1).join("/");
+	const nearby = pages
+		.filter((pg) =>
+			(pg.usesFiles ?? []).some((f) =>
+				f.startsWith(`${folder.split("/ui")[0]}/`)
+			)
+		)
+		.map((pg) => pg.route);
+	return { routes: [...new Set(nearby)], direct: false };
+};
 
 const touching = endpoints.filter((e) => e.tables?.includes(table));
 if (touching.length === 0) {
@@ -97,7 +133,32 @@ console.log(
 	`The contract name is \`${camel}\`. Every place below either carries that key or has to learn it.\n`
 );
 
-console.log(`**1 · Server contracts that gain \`${camel}\`**\n`);
+console.log("**1 · The API routes that carry this row**\n");
+console.log("| Endpoint | Route | Paths | Methods | What changes |");
+console.log("|---|---|---|---|---|");
+for (const e of owners) {
+	const base = urlOf(e.serverPath);
+	// endpoints.json records paths relative to the feature folder, and the
+	// folder is already in the URL — joining them blindly gave
+	// /subjects/import/import.
+	const subs = e.paths
+		.map((sp) => (sp === "/" ? "" : sp))
+		.filter((sp) => sp && !base.endsWith(sp))
+		.map((sp) => `\`${sp}\``);
+	const ms = e.methods.join(" ").toUpperCase();
+	// Methods are recorded per endpoint, not per path, so say so rather than
+	// implying DELETE works on every route under it.
+	const writes = /POST|PUT|PATCH/.test(ms);
+	console.log(
+		`| \`${e.id}\` | \`${base}\` | ${subs.length ? subs.join(" ") : "—"} | ${ms} | ${
+			writes
+				? `accept \`${camel}\` where a subject is written, and return it on every read`
+				: `return \`${camel}\``
+		} |`
+	);
+}
+
+console.log(`\n**2 · Server contracts that gain \`${camel}\`**\n`);
 console.log("| Schema object | Kind | Add the key? | File |");
 console.log("|---|---|---|---|");
 for (const e of owners) {
@@ -136,7 +197,7 @@ for (const e of owners) {
 }
 
 console.log(
-	`\n**2 · Handlers that must read, write and return \`${camel}\`**\n`
+	`\n**3 · Handlers that must read, write and return \`${camel}\`**\n`
 );
 for (const e of owners) {
 	for (const h of e.handlerFiles) {
@@ -158,7 +219,7 @@ const clients = bindings.filter((b) =>
 	[...owned].some((sp) => b.serverPath.startsWith(sp))
 );
 console.log(
-	`\n**3 · Front end — ${clients.length} file(s) import these schemas**\n`
+	`\n**4 · Front end — ${clients.length} file(s) import these schemas**\n`
 );
 console.log(
 	"Schema-first: the client imports the server's Zod schemas, so the type"
@@ -166,16 +227,23 @@ console.log(
 console.log(
 	"arrives on its own. What does NOT arrive is a form field or a column.\n"
 );
-console.log("| App | File | Symbols it imports | What it needs |");
-console.log("|---|---|---|---|");
+console.log("| App | Screen | File | Symbols it imports | What it needs |");
+console.log("|---|---|---|---|---|");
 for (const b of clients) {
 	// A Response schema is read; only a Request schema is something the file
 	// fills in. "Create" alone matched CreateSubjectResponseSchema, which reads.
 	const builds = b.symbols.some(
 		(sym) => /Request/.test(sym) && !/Response/.test(sym)
 	);
+	const on = screensUsing(b.clientFile);
+	const where = on.routes.length
+		? on.routes.map((r) => `\`${r}\``).join("<br>") +
+			(on.direct ? "" : " *(through this screen's module)*")
+		: "*no page reaches this — check whether it is still used*";
 	console.log(
-		`| ${b.app} | \`${b.clientFile}\` | ${b.symbols.map((sym) => `\`${sym}\``).join(", ")} | ${
+		`| ${b.app} | ${where} | \`${b.clientFile.split("modules/").pop()}\` | ${b.symbols
+			.map((sym) => `\`${sym}\``)
+			.join(", ")} | ${
 			builds
 				? `**an input for \`${camel}\`** — it builds a request`
 				: "nothing, unless it should display it"
