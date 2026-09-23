@@ -67,11 +67,15 @@ const writes = (e: Endpoint) =>
 // codebase actually uses rather than guessing one.
 const stems = (name: string) => {
 	const out = new Set<string>();
-	// The whole name, and its last word on its own: `leave-policies` is served
+	// The whole name, its last word, and its first: `leave-policies` is served
 	// by `leavepolicy`, and its response schemas are called
-	// `allPoliciesResponseSchema` — no "leave" in sight.
+	// `allPoliciesResponseSchema` — no "leave" in sight. The first word matters
+	// for a table named after the join rather than the thing: the roll lives in
+	// `student-in-institutes`, whose last word is `institutes`, and it is served
+	// by `.../students`. Without the first word that table has no owner at all,
+	// and the ripple comes back empty while reporting 68 readers.
 	const parts = name.toLowerCase().split(/[-_]/);
-	for (const base of [name.toLowerCase(), parts.at(-1) ?? ""]) {
+	for (const base of [name.toLowerCase(), parts.at(-1) ?? "", parts[0] ?? ""]) {
 		if (!base) {
 			continue;
 		}
@@ -101,8 +105,13 @@ const sorted = [...hits].sort(
 		a.id.localeCompare(b.id)
 );
 
-const owners = sorted.filter((e) => affinity(e) > 0);
-const others = sorted.filter((e) => affinity(e) === 0);
+// Only the best-matching endpoints own the table. Anything above zero is too
+// generous: `student-in-institutes` yields the stem "student", which half the
+// server carries somewhere in its path, and the roll's owner list filled up
+// with sign-in, fee export and the timetable.
+const best = Math.max(0, ...sorted.map(affinity));
+const owners = best > 0 ? sorted.filter((e) => affinity(e) === best) : [];
+const others = sorted.filter((e) => !owners.includes(e));
 
 const show = (e: Endpoint) => {
 	console.log(`  ${e.id}  ${writes(e) ? "WRITES" : "reads "}  ${e.serverPath}`);
