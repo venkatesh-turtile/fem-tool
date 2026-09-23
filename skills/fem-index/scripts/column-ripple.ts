@@ -118,11 +118,15 @@ if (touching.length === 0) {
 // codebase actually uses rather than guessing one.
 const stems = (name: string) => {
 	const out = new Set<string>();
-	// The whole name, and its last word on its own: `leave-policies` is served
+	// The whole name, its last word, and its first: `leave-policies` is served
 	// by `leavepolicy`, and its response schemas are called
-	// `allPoliciesResponseSchema` — no "leave" in sight.
+	// `allPoliciesResponseSchema` — no "leave" in sight. The first word matters
+	// for a table named after the join rather than the thing: the roll lives in
+	// `student-in-institutes`, whose last word is `institutes`, and it is served
+	// by `.../students`. Without the first word that table has no owner at all,
+	// and the ripple comes back empty while reporting 68 readers.
 	const parts = name.toLowerCase().split(/[-_]/);
-	for (const base of [name.toLowerCase(), parts.at(-1) ?? ""]) {
+	for (const base of [name.toLowerCase(), parts.at(-1) ?? "", parts[0] ?? ""]) {
 		if (!base) {
 			continue;
 		}
@@ -141,9 +145,18 @@ const stems = (name: string) => {
 };
 const flat = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
 const wanted = stems(table.split("/").pop() ?? table);
-const owners = touching.filter((e) =>
-	wanted.some((w) => flat(e.serverPath).includes(w))
-);
+// How many of the table's spellings a path carries. One is weak evidence and
+// two is strong: `leave-policies` gives "leave" and "policy", and only
+// `.../hrms/leavepolicy/admin` has both — `.../leaverequest/admin` has "leave"
+// alone and does not define a policy's shape.
+const affinity = (e: { serverPath: string }) =>
+	wanted.filter((w) => flat(e.serverPath).includes(w)).length;
+// Only the best-matching endpoints own the table. Taking everything above zero
+// is how a column on the roll reached student sign-in, fee export and the
+// timetable: `student-in-institutes` yields the stem "student", and half the
+// server has that somewhere in its path.
+const best = Math.max(0, ...touching.map(affinity));
+const owners = best > 0 ? touching.filter((e) => affinity(e) === best) : [];
 const rest = touching.filter((e) => !owners.includes(e));
 
 // Every schema object a route file declares. These are what gain the key.
