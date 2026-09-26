@@ -37,6 +37,24 @@ first hit**. Every decision cites evidence: the schema field, the DB column, or
 Landing on step 5 is the single strongest signal that a proposed option is
 expensive. Say so at gate 2.
 
+### A permissive schema makes step 1 a lie
+
+`z.object({}).loose()`, `z.unknown()` and `z.any()` accept **any** key. So every
+conceivable new field hits step 1 — *"already in the contract, cost 0"* — and the
+ladder can never reach step 5. Step 5 is not unreachable because nothing is
+unstored; it is unreachable because an open blob swallowed the question.
+
+One module reported thirteen new organisation fields at **zero days** on exactly
+this. True, in the sense that the save accepted them. Useless, in the sense that
+nothing was modelled, nothing was validated, nothing could be filtered or sorted
+on, and the front end received them all as `unknown`.
+
+**When the ladder stops at step 1 because a schema is open, it has not answered
+the question — it has dodged it.** Record it as a named decision with both
+prices: the blob at ~0, and the named columns at whatever `L4` costs. Then
+somebody chooses. Rule **P** in `validate-outputs.ts` warns when this is
+missing.
+
 ## 6.3 Impact layers
 
 | Layer | Name | Examples |

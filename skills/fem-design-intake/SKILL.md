@@ -50,6 +50,22 @@ Two fixes:
   days, and **NFR-7 changes** from *"parse, never execute"* to *"execute
   sandboxed, no network, then parse"*
 
+## A labelled control is not a filter
+
+`#22` adds the `<label>` rule that was missing, so a form's fields are read at
+last. The loop below it still reads every `<input>` and `<select>` as well — and a
+labelled input carries no `name` or `placeholder` of its own, because the text is
+in the label, so it comes back a second time as a **filter named after its own
+type**. One setup form produced four: `text`, `date`, `file`, and a placeholder.
+
+A control whose `</label>` ends within 400 characters before it is now skipped by
+that loop — the label already named it. A control **without** a label keeps the
+old classification, so a toolbar search box and a filter select on a table screen
+are untouched.
+
+On the same form: 25 fields and **no** phantom filters, where the label rule alone
+gives 25 fields and 4.
+
 ## What the markup declares and the page never shows
 
 **The parser reads markup, not styles.** A column removed with `display:none`

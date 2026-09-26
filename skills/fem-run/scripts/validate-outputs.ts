@@ -204,6 +204,44 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 		}
 	}
 
+	// R · the old screen paged and the new one does not.
+	// A list endpoint in this repo defaults to ten rows and caps at fifty
+	// (Postal Law 4). A table that sends no page parameter gets the first ten and
+	// draws no way to reach the eleventh -- no error, no empty state, nothing a
+	// screenshot would show. On one module the design dropped both the search box
+	// and the paging control, and a school with sixty subjects would have seen
+	// ten of them. The removal is free on the server, which is exactly why it
+	// reads as costing nothing.
+	if (existsSync(join(dir, "01-baseline.json"))) {
+		const base = JSON.parse(readFileSync(join(dir, "01-baseline.json"), "utf8"));
+		const design = existsSync(join(dir, "02-new-design.json"))
+			? JSON.parse(readFileSync(join(dir, "02-new-design.json"), "utf8"))
+			: { screens: [] };
+		const kinds = (doc_: { spec?: { screens?: unknown[] }; screens?: unknown[] }) =>
+			new Set(
+				((doc_.spec?.screens ?? doc_.screens ?? []) as {
+					elements?: { kind: string }[];
+				}[]).flatMap((sc) => (sc.elements ?? []).map((e) => e.kind))
+			);
+		const had = kinds(base);
+		const has = kinds(design);
+		const prose = `${changes.map((c) => c.summary ?? "").join(" ")} ${
+			existsSync(join(dir, "04-impact.md"))
+				? readFileSync(join(dir, "04-impact.md"), "utf8")
+				: ""
+		}`;
+		for (const [kind, what, word] of [
+			["pagination", "paging", /pag(e|es|ing|ination)/i],
+			["search", "searching", /search/i],
+		] as [string, string, RegExp][]) {
+			if (had.has(kind) && !has.has(kind) && !word.test(prose)) {
+				warn(
+					`the old screen has ${what} and the new design draws none, and no change item mentions it. Say what happens to it: the list stays paginated on the server, so a table that asks for no page gets the first page and no way past it`
+				);
+			}
+		}
+	}
+
 	// A · P3 catalogued more than P4 traced
 	if (
 		typeof doc.catalogueSize === "number" &&
@@ -345,6 +383,51 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 					);
 				}
 			}
+		}
+		// P · the ladder hit step 1 because a schema accepts ANYTHING.
+		// z.object({}).loose(), z.unknown() and z.any() are open blobs: every
+		// conceivable new field "is already in the contract", so the ladder
+		// short-circuits at step 1 and step 5 -- "stored nowhere" -- becomes
+		// unreachable. A module reported thirteen new fields at zero days on
+		// exactly this, and never mentioned that real columns were an option.
+		// Cost 0 may well be right; it is not allowed to be silent.
+		const LOOSE = /loose\(\)|z\.unknown\(\)|z\.any\(\)|extra_?[Dd]etails/;
+		const step1 = /^ladder step 1/.test(String(c.resolution ?? ""));
+		if ((kind === "D1" || kind === "D2") && step1) {
+			const blobbed = LAYERS.some((L) =>
+				LOOSE.test(
+					`${impact[L]?.change ?? ""} ${((impact[L]?.evidence as string[]) ?? []).join(" ")}`
+				)
+			);
+			const weighed =
+				Boolean(c.decision) ||
+				Boolean(impact.L4?.blockedOnQuestion) ||
+				/instead|alternative|named column|real column/i.test(
+					String(impact.L4?.change ?? "")
+				);
+			if (blobbed && !weighed) {
+				warn(
+					`${id}: resolves at ladder step 1 into an open blob, so it prices at zero without anything being modelled. Say what a named column would cost instead, as a decision — "the contract accepts it" is not the same as "we have modelled it"`
+				);
+			}
+		}
+		// Q · a visual change sitting on a save path.
+		// V0 and V1 skip backend tracing by design (§6.1), which is right for a
+		// restyle and wrong for "the whole form saves at once". One such item was
+		// catalogued V1, priced at zero, and would have shipped a screen whose
+		// thirteen new fields could be set once and never corrected -- no
+		// endpoint could update them. Retagged A1 at 4.1 days.
+		if (
+			(kind === "V0" || kind === "V1") &&
+			/\b(save[sd]?|submit(s|ted)?|updat(e|es|ing)|creat(e|es))\b/i.test(
+				String(c.summary ?? "")
+			) &&
+			String(impact.L1?.change ?? "none").startsWith("none") &&
+			((impact.L1?.evidence as string[]) ?? []).length === 0
+		) {
+			warn(
+				`${id}: a ${kind} whose summary describes saving, with L1 "none" and nothing cited. Confirm an endpoint can actually write what the new screen saves — a visual change skips tracing, and this one may not be visual`
+			);
 		}
 	}
 }
@@ -580,6 +663,51 @@ if (want("P8")) {
 			}
 		}
 	}
+	// S · a new column, and no instructions for it.
+	// "One additive column, nothing breaking" is true and useless. A developer
+	// then has to work out which schema objects gain the key, which handlers must
+	// select it, and which of the screens importing those schemas actually need a
+	// control -- and this repo forbids select() without explicit columns, so there
+	// is no read that picks it up for free. column-ripple.ts answers all of it
+	// mechanically. REPORT.md must carry that answer, once per key.
+	const rippleReportAt = join(dir, "REPORT.md");
+	if (existsSync(join(dir, "04-impact.json")) && existsSync(rippleReportAt)) {
+		const impactDoc = JSON.parse(
+			readFileSync(join(dir, "04-impact.json"), "utf8")
+		);
+		const NEW_STORAGE = ["additive_column", "new_table_with_relations"];
+		const storing = (impactDoc.changes ?? []).filter(
+			(c: { impact?: Record<string, { rubric?: string[] }> }) =>
+				LAYERS.some((L) =>
+					(c.impact?.[L]?.rubric ?? []).some((k) => NEW_STORAGE.includes(k))
+				)
+		);
+		if (storing.length > 0) {
+			const report = readFileSync(rippleReportAt, "utf8");
+			const missing = storing.filter(
+				(c: { id: string }) => !report.includes(c.id)
+			);
+			if (missing.length > 0) {
+				err(
+					`REPORT.md stores something new (${missing
+						.map((c: { id: string }) => c.id)
+						.join(", ")}) and never names the change. Give every new column or table its own section: the schema objects that gain the key and the ones that must NOT, the handlers, the routes, the ONE screen the design draws it on, and the files that import the schema but need no control — \`bun .claude/skills/fem-index/scripts/column-ripple.ts <table> <column>\``
+				);
+			}
+			const RIPPLE = [
+				/schema object|Zod schema|MUST.{0,20}change/i,
+				/handler/i,
+				/screen|front ?end/i,
+			];
+			const thin = RIPPLE.filter((re) => !re.test(report));
+			if (thin.length > 0) {
+				warn(
+					`REPORT.md prices ${storing.length} new stored key(s) but reads thin on the ripple — a developer still has to work out the schema objects, the handlers and the screens. Run column-ripple.ts and paste it, per key`
+				);
+			}
+		}
+	}
+
 	const summaryAt = join(dir, "SUMMARY.md");
 	if (existsSync(summaryAt)) {
 		const text = readFileSync(summaryAt, "utf8");
