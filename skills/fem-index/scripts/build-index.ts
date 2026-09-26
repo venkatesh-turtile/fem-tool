@@ -522,7 +522,23 @@ function buildEndpoints(bindings: Binding[]): Endpoint[] {
 		if (seen.has(dirKey)) {
 			continue;
 		}
-		seen.set(dirKey, endpointFor(dirKey));
+		const ep = endpointFor(dirKey);
+		seen.set(dirKey, ep);
+		// A screen that imports `settings/common/schemas` binds to the shared
+		// schema folder, which has no routes and no handlers — so the endpoint
+		// that actually writes the table, `settings/` itself, never entered the
+		// index. finance-payout/settings and payroll-profiles both came back as
+		// "no endpoint touches this" that way, and Rule O trusted it. Index the
+		// folder one level up when it defines routes. One level only: walking
+		// further climbs out of the feature into the app's top-level router.
+		const up = dirname(dirKey);
+		if (ep.convention !== "shared-schema" || seen.has(up)) {
+			continue;
+		}
+		const parent = endpointFor(up);
+		if (parent.routeCount > 0) {
+			seen.set(up, parent);
+		}
 	}
 	const out = [...seen.values()].sort((a, b) =>
 		a.serverPath.localeCompare(b.serverPath)

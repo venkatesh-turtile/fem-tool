@@ -13,7 +13,8 @@
  * exit 0 clean (warnings allowed) · 1 violations · 2 usage
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { ownersOf } from "../../fem-index/scripts/table-owners.ts";
 
 const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
@@ -171,6 +172,65 @@ for (const [file, at] of [
 	void file;
 }
 
+// Rule M needs to know which module owns a table, and the index knows: the
+// endpoints that touch it, and among them the ones named after it. Without an
+// index the check is skipped and says so, rather than passing silently.
+const escaped = (v: string) => v.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+const SCHEMA_TABLE_RE = new RegExp(
+	`${escaped(CFG.server.schema)}/([^:\\s)]+?)\\.ts`,
+	"g"
+);
+const endpointsIndex = join(ROOT, CFG.paths.index, "endpoints.json");
+const bindingsIndex = join(ROOT, CFG.paths.index, "frontend-bindings.json");
+const tableOwners = existsSync(endpointsIndex)
+	? (() => {
+			const { endpoints } = JSON.parse(
+				readFileSync(endpointsIndex, "utf8")
+			) as { endpoints: { serverPath: string; tables?: string[] }[] };
+			// This module's backend is what its own screens call. Folder names
+			// do not say it: the Departments screens call endpoints under hrms/.
+			// The index records a binding's file; its endpoint is that file's
+			// folder, or the folder above for a shared `common/` schema.
+			const called = new Set<string>();
+			if (existsSync(bindingsIndex)) {
+				const { bindings } = JSON.parse(
+					readFileSync(bindingsIndex, "utf8")
+				) as { bindings: { app: string; module: string; serverPath: string }[] };
+				for (const b of bindings) {
+					if (b.app === app && b.module === moduleName.split("/")[0]) {
+						called.add(dirname(b.serverPath));
+						called.add(dirname(dirname(b.serverPath)));
+					}
+				}
+			}
+			const inModule = (serverPath: string) =>
+				called.has(serverPath) ||
+				`${serverPath}/`.includes(`/${moduleName}/`);
+			return (table: string) => {
+				const touching = endpoints.filter((e) => e.tables?.includes(table));
+				const { owners } = ownersOf(table, touching);
+				// A table nobody is named after belongs to whoever already reads
+				// it. Only when this module does not is it someone else's.
+				const mine =
+					owners.length > 0
+						? owners.some((e) => inModule(e.serverPath))
+						: touching.some((e) => inModule(e.serverPath));
+				return {
+					mine,
+					why:
+						owners.length > 0
+							? `owned by ${owners.map((e) => e.serverPath.split("modules/").pop()).join(", ")}`
+							: "no endpoint of this module touches it",
+				};
+			};
+		})()
+	: null;
+if (want("P4") && !tableOwners && existsSync(join(dir, "04-impact.json"))) {
+	warn(
+		`Rule M not checked — no index at ${CFG.paths.index}/endpoints.json. Run fem-index first`
+	);
+}
+
 if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 	const doc = read("04-impact.json");
 	validate(doc, loadSchema("impact.schema.json"), "04-impact");
@@ -262,6 +322,32 @@ if (want("P4") && existsSync(join(dir, "04-impact.json"))) {
 			if (!looked) {
 				err(
 					`${id} ${L}: prices a new endpoint without saying what already exists. List the endpoints that touch the same tables in "searchedEndpoints" and say why none fits — \`bun .claude/skills/fem-index/scripts/endpoints-for-table.ts <table>\``
+				);
+			}
+		}
+		// M · a rung-3 or rung-4 verdict built on another module's table.
+		// Departments' start and end time were filed "in the DB but not exposed"
+		// on the strength of staff_attendance_configs — a table the attendance
+		// module owns and the Departments screen has never called. That halved a
+		// signed-off estimate. The ladder is about THIS module's backend: if none
+		// of the tables the evidence cites is owned by one of this module's
+		// endpoints, the rung is 5.
+		const resolution = String(c.resolution ?? "");
+		if (/ladder step [34]\b/i.test(resolution) && tableOwners) {
+			const cited = new Set<string>();
+			for (const L of LAYERS) {
+				for (const ev of (impact[L]?.evidence as string[]) ?? []) {
+					for (const m of String(ev).matchAll(SCHEMA_TABLE_RE)) {
+						cited.add(m[1] as string);
+					}
+				}
+			}
+			const foreign = [...cited].filter((t) => !tableOwners(t).mine);
+			if (cited.size > 0 && foreign.length === cited.size) {
+				err(
+					`${id}: "${resolution.split(" — ")[0]}" but every table its evidence cites belongs to another module — ${foreign
+						.map((t) => `${t} (${tableOwners(t).why})`)
+						.join("; ")}. Data this module's backend does not own is rung 5, with the other module named as a possible source (Rule M)`
 				);
 			}
 		}

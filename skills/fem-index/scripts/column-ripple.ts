@@ -14,8 +14,9 @@
  * the REPORT. It is for REPORT.md only: the summary is for people who do not
  * read code, and a table of file paths is exactly what does not belong there.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ownersOf, stems } from "./table-owners.ts";
 
 const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
@@ -108,73 +109,43 @@ if (touching.length === 0) {
 }
 
 // The endpoints that OWN the table, by name affinity — the same test the
-// endpoint lookup uses. A column change ripples through its own module's
-// contracts; forty other endpoints that read the table in passing do not
-// define its shape.
-// Punctuation removed on both sides: the table `leave-requests` is owned by
-// endpoints called `leaverequest`, and a literal match finds neither.
-// A table name and an endpoint name rarely agree on plurals: leave-policies is
-// served by leavepolicy, leave-requests by leaverequest. Try the spellings a
-// codebase actually uses rather than guessing one.
-const stems = (name: string) => {
-	const out = new Set<string>();
-	// The whole name, its last word, and its first: `leave-policies` is served
-	// by `leavepolicy`, and its response schemas are called
-	// `allPoliciesResponseSchema` — no "leave" in sight. The first word matters
-	// for a table named after the join rather than the thing: the roll lives in
-	// `student-in-institutes`, whose last word is `institutes`, and it is served
-	// by `.../students`. Without the first word that table has no owner at all,
-	// and the ripple comes back empty while reporting 68 readers.
-	const parts = name.toLowerCase().split(/[-_]/);
-	for (const base of [name.toLowerCase(), parts.at(-1) ?? "", parts[0] ?? ""]) {
-		if (!base) {
-			continue;
-		}
-		out.add(base);
-		if (base.endsWith("ies")) {
-			out.add(`${base.slice(0, -3)}y`);
-		}
-		if (base.endsWith("s")) {
-			out.add(base.slice(0, -1));
-		}
-		out.add(`${base}s`);
-	}
-	return [...out]
-		.map((v) => v.replace(/[^a-z0-9]/g, ""))
-		.filter((v) => v.length > 3);
-};
-const flat = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
+// endpoint lookup uses, from the same file. A column change ripples through
+// its own module's contracts; forty other endpoints that read the table in
+// passing do not define its shape.
+const { owners } = ownersOf(table, touching);
+// Schema objects are named after the entity, so they are matched against the
+// table's own name even when its owner was found through its folder.
 const wanted = stems(table.split("/").pop() ?? table);
-// How many of the table's spellings a path carries. One is weak evidence and
-// two is strong: `leave-policies` gives "leave" and "policy", and only
-// `.../hrms/leavepolicy/admin` has both — `.../leaverequest/admin` has "leave"
-// alone and does not define a policy's shape.
-const affinity = (e: { serverPath: string }) =>
-	wanted.filter((w) => flat(e.serverPath).includes(w)).length;
-// Only the best-matching endpoints own the table. Taking everything above zero
-// is how a column on the roll reached student sign-in, fee export and the
-// timetable: `student-in-institutes` yields the stem "student", and half the
-// server has that somewhere in its path.
-const best = Math.max(0, ...touching.map(affinity));
-const owners = best > 0 ? touching.filter((e) => affinity(e) === best) : [];
 const rest = touching.filter((e) => !owners.includes(e));
 
 // Every schema object a route file declares. These are what gain the key.
-const schemasIn = (file: string): string[] => {
-	// Two conventions live in this codebase. The suffixed one keeps its schema
-	// objects in the same file as its routes; the plural one keeps them next
-	// door in schema.ts. Reading only the route file returned nothing for the
-	// second kind, and an empty list reads as "nothing to change here".
-	const candidates = [file];
+// Two conventions live in this codebase. The suffixed one keeps its schema
+// objects in the same file as its routes; the plural one keeps them next door
+// in schema.ts. Reading only the route file returned nothing for the second
+// kind, and an empty list reads as "nothing to change here".
+// A suffixed folder can also split its routes across several features —
+// sections/timetable has configure-slots, configure-subjects and timetable,
+// each with its own *.schema.ts. The index records only the first as the route
+// file, so SubjectStaffAssignmentSchema, in the second, was never read.
+const schemaFilesFor = (file: string): string[] => {
 	const dir = file.replace(/\/[^/]*$/, "");
-	for (const sibling of ["schema.ts", "schemas.ts"]) {
-		const at = join(ROOT, dir, sibling);
-		if (existsSync(at) && !candidates.includes(`${dir}/${sibling}`)) {
-			candidates.push(`${dir}/${sibling}`);
+	const siblings = (() => {
+		try {
+			return readdirSync(join(ROOT, dir)).sort();
+		} catch {
+			return [];
 		}
-	}
-	return candidates.flatMap((f) => schemaObjectsIn(f));
+	})().filter(
+		(f) => f === "schema.ts" || f === "schemas.ts" || f.endsWith(".schema.ts")
+	);
+	return [file, ...siblings.map((f) => `${dir}/${f}`)].filter(
+		(f, i, all) => all.indexOf(f) === i
+	);
 };
+const schemasIn = (file: string): string[] =>
+	schemaFilesFor(file)
+		.flatMap((f) => schemaObjectsIn(f))
+		.filter((n, i, all) => all.indexOf(n) === i);
 
 const schemaObjectsIn = (file: string): string[] => {
 	const at = join(ROOT, file);
@@ -229,8 +200,7 @@ for (const e of owners) {
 	// developer actually has to open.
 	const fileOf = new Map<string, string>();
 	if (e.routeFile) {
-		const dir = e.routeFile.replace(/\/[^/]*$/, "");
-		for (const f of [e.routeFile, `${dir}/schema.ts`, `${dir}/schemas.ts`]) {
+		for (const f of schemaFilesFor(e.routeFile)) {
 			for (const o of schemaObjectsIn(f)) {
 				if (!fileOf.has(o)) {
 					fileOf.set(o, f);

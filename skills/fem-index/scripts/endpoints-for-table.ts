@@ -15,6 +15,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { affinity, ownersOf } from "./table-owners.ts";
 
 const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(join(ROOT, "fem.config.json"), "utf8"));
@@ -55,63 +56,20 @@ const writes = (e: Endpoint) =>
 	e.methods.some((m) => ["post", "put", "patch", "delete"].includes(m));
 // Shared words between the table's name and the endpoint's path. "nodes"
 // against ".../academic-nodes/bulk-import" scores; against
-// ".../fee-management/rate-card" it does not.
-// The LAST segment of the table name is the one that identifies it. Splitting
-// the whole path matched "cms", which every endpoint in the tree contains, so
-// forty-four endpoints all looked like they belonged to it.
-// Compare with the punctuation taken out. The table is `leave-requests` and
-// the endpoints that own it are called `leaverequest` — a literal match finds
-// neither, and reports that nothing owns the table.
-// A table name and an endpoint name rarely agree on plurals: leave-policies is
-// served by leavepolicy, leave-requests by leaverequest. Try the spellings a
-// codebase actually uses rather than guessing one.
-const stems = (name: string) => {
-	const out = new Set<string>();
-	// The whole name, its last word, and its first: `leave-policies` is served
-	// by `leavepolicy`, and its response schemas are called
-	// `allPoliciesResponseSchema` — no "leave" in sight. The first word matters
-	// for a table named after the join rather than the thing: the roll lives in
-	// `student-in-institutes`, whose last word is `institutes`, and it is served
-	// by `.../students`. Without the first word that table has no owner at all,
-	// and the ripple comes back empty while reporting 68 readers.
-	const parts = name.toLowerCase().split(/[-_]/);
-	for (const base of [name.toLowerCase(), parts.at(-1) ?? "", parts[0] ?? ""]) {
-		if (!base) {
-			continue;
-		}
-		out.add(base);
-		if (base.endsWith("ies")) {
-			out.add(`${base.slice(0, -3)}y`);
-		}
-		if (base.endsWith("s")) {
-			out.add(base.slice(0, -1));
-		}
-		out.add(`${base}s`);
-	}
-	return [...out]
-		.map((v) => v.replace(/[^a-z0-9]/g, ""))
-		.filter((v) => v.length > 3);
-};
-const flat = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
-const words = stems(table.split("/").pop() ?? table);
-const affinity = (e: Endpoint) => {
-	const path = flat(e.serverPath);
-	return words.filter((w) => path.includes(w)).length;
-};
+// ".../fee-management/rate-card" it does not. The rules live in
+// table-owners.ts, shared with the column ripple and the validator.
+const { words, owners: owning } = ownersOf(table, hits);
+const score = (e: Endpoint) => affinity(words, e.serverPath);
 const sorted = [...hits].sort(
 	(a, b) =>
-		affinity(b) - affinity(a) ||
+		Number(owning.includes(b)) - Number(owning.includes(a)) ||
+		score(b) - score(a) ||
 		Number(writes(b)) - Number(writes(a)) ||
 		a.id.localeCompare(b.id)
 );
 
-// Only the best-matching endpoints own the table. Anything above zero is too
-// generous: `student-in-institutes` yields the stem "student", which half the
-// server carries somewhere in its path, and the roll's owner list filled up
-// with sign-in, fee export and the timetable.
-const best = Math.max(0, ...sorted.map(affinity));
-const owners = best > 0 ? sorted.filter((e) => affinity(e) === best) : [];
-const others = sorted.filter((e) => !owners.includes(e));
+const owners = sorted.filter((e) => owning.includes(e));
+const others = sorted.filter((e) => !owning.includes(e));
 
 const show = (e: Endpoint) => {
 	console.log(`  ${e.id}  ${writes(e) ? "WRITES" : "reads "}  ${e.serverPath}`);

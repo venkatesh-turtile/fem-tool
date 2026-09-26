@@ -29,10 +29,18 @@ first hit**. Every decision cites evidence: the schema field, the DB column, or
 ```
 1  in the current response schema              cost 0 · FE only
 2  derivable client-side from returned fields  cost 0 · flag perf
-3  in the DB but not exposed                   additive API · low
-4  derivable server-side (join, aggregate)     handler + index · medium
-5  not stored anywhere                         DB + write path + backfill · high
+3  in THIS module's tables but not exposed     additive API · low
+4  derivable from THIS module's tables         handler + index · medium
+   (join, aggregate) without crossing a
+   module boundary
+5  not in this module's backend                DB + write path + backfill · high
+   — including data that exists only in
+   ANOTHER module's tables
 ```
+
+"This module" is the module under analysis. A field another module stores is
+rung 5 here, with that module named in the evidence as a possible source —
+Rule M in `fem-impact`.
 
 Landing on step 5 is the single strongest signal that a proposed option is
 expensive. Say so at gate 2.
