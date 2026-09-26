@@ -17,6 +17,12 @@ Index ref `<branch>@<sha>` · rubric <calibrated|UNCALIBRATED>
 ## 3 · Change catalogue      every C- id, before → after, taxonomy counts
 ## 4 · Impact matrix         the L1-L12 grid; "none" is a value, blank is a bug
 ## 5 · Estimate              per change, per layer, order of operations shown
+## 5b · New database keys    one section per key — MANDATORY when anything is stored
+      Key n of N · table, column, contract name, the screens the design draws it on
+      (1) migration  (2) schemas that MUST change  (3) schemas that must NOT
+      (4) handlers   (5) API routes                (6) where the input goes — ONE screen
+      (7) files that import the schema and get NO input   (8) tests   (9) done when
+      From column-ripple.ts, then NARROWED to what the design draws. Rule S enforces it.
 ## 6 · Decisions             buckets + deltas + who approved at gate 2
 ## 7 · Plan                  expand → migrate → contract, shippable increments
 ## 8 · Risks                 including any layer reading 0 that should not

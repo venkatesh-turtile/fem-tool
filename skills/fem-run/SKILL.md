@@ -115,6 +115,27 @@ schema can express:
 | **D** | `assumed: true` with no `searched` — §6.4 |
 | **E** | a blocked layer but a status that does not say so |
 | **F** | **a layer that says its cost is "covered by C-x" where `C-x` prices nothing** |
+| **L** | `L12` says no consumer is affected and cites nothing |
+| **M** | a change pointing at a screen id that is in neither spec |
+| **N** | the design hid columns and `04-impact.md` never mentions them |
+| **O** | a new endpoint priced without saying what already exists |
+| **P** | a `D1`/`D2` resolving at step 1 into an open blob, with no decision beside it |
+| **Q** | a `V0`/`V1` whose summary describes saving, with `L1` "none" and nothing cited |
+| **R** | the old screen paged or searched and the new design draws neither |
+
+**P, Q and R warn rather than fail.** Each reads text rather than structure, so a
+false positive must never block a phase — but each one is a mistake that reached
+a signed-off document:
+
+- **P** — thirteen fields priced at zero because an open `jsonb` blob accepts any
+  key, so the ladder stopped at step 1 and nobody was told a named column was an
+  option.
+- **Q** — *"the whole form saves at once"* catalogued `V1`. A `V1` skips backend
+  tracing, so it priced at zero. No endpoint could update the record beyond its
+  name; retagged `A1` at **4.1 days**.
+- **R** — a design dropped the paging control from a list that defaults to ten
+  rows and caps at fifty. The table would have shown ten subjects with no way to
+  reach the eleventh: no error, no empty state, nothing a screenshot shows.
 
 **F is why this exists.** Twice, a compatibility check and an integration test
 vanished when gate 2 approved a cheaper variant: the owner's layer became

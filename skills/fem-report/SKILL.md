@@ -44,6 +44,38 @@ It prints three tables, ready to paste:
 3. **the front-end files** that import those schemas, and which of them need an
    actual input rather than just the type
 
+### The shape it takes in REPORT.md — one section per key, and it is mandatory
+
+A developer reading *"one additive column, nothing breaking"* has been told
+nothing they can act on. **Rule `S` refuses P8** when a change prices
+`additive_column` or `new_table_with_relations` and `REPORT.md` never names it.
+
+Under a heading `## 5b · New database keys — one section per key`, **every key
+gets its own block**, numbered `Key n of N`, containing all nine of these:
+
+| | What goes in it |
+|---|---|
+| **header table** | table · column with its full SQL type · contract name · **the screens the design draws it on** · change id · whether a backfill is needed |
+| **① the migration** | the schema file, the line to add, in context, and the `db:generate && db:migrate` command |
+| **② schemas that MUST change** | numbered, with file, symbol, kind, and the exact line to add. Mark which ones inherit rather than repeat the key |
+| **③ schemas that must NOT change** | with the reason each is excluded. A query schema only gains the key if the screen filters by it — say so |
+| **④ handlers** | per file, which reads, writes and returns must learn it. State that explicit-column reads mean nothing picks it up for free |
+| **⑤ API routes** | method and path, what changes on each, which routes are untouched, and how many other endpoints read the table without being reached |
+| **⑥ where the input goes** | the **one** screen, and the package that carries the key through without UI |
+| **⑦ files that import the schema and get NO input** | every file `column-ripple.ts` flags that the design does not draw the key on, with the reason. This is the half that gets it wrong: somebody "completes" a key by adding a control the design never asked for |
+| **⑧ tests** and **⑨ done when** | the layers, and a checklist ending in a typecheck across every app |
+
+**Scope ⑥ and ⑦ by the design, not by the import graph.** `column-ripple.ts`
+flags every file that builds a request from a schema gaining the key — for one
+boolean on `subjects` that was **13 files across four modules**, including exam
+screens and library screens. The design drew it on **one** table. The ripple says
+what *could* need a control; the design says what *does*. A report that prints
+the first without narrowing to the second sends a developer to edit eight files
+that should not change.
+
+Close each key's block with its own price, broken down by layer, so the cost sits
+next to the work rather than in a table forty lines away.
+
 This belongs in **REPORT.md only**. `SUMMARY.md` says "one new thing to store,
 on the subject" and stops; a table of file paths is exactly what does not belong
 in front of someone who does not read code.

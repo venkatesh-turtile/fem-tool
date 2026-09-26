@@ -93,6 +93,9 @@ const text = (h: string) =>
 		.trim();
 const all = (h: string, re: RegExp) => [...h.matchAll(re)];
 
+/** How far past a </label> a control still counts as that label's field. */
+const LABEL_REACH = 400;
+
 /** Is there real DOM here, or is it a compiled React bundle? */
 function parseability(raw: string) {
 	const dom = strip(raw);
@@ -167,12 +170,28 @@ function hiddenByCss(raw: string): Hidden[] {
 	const found = new Map<string, Hidden>();
 	for (const style of all(raw, /<style[^>]*>([\s\S]*?)<\/style>/gi)) {
 		const css = style[1] ?? "";
+		// Where every /* ... */ sits, so a rule found INSIDE one can be skipped.
+		// A comment explaining a rule tends to quote it -- "/* .btn { display:none }
+		// is not enough */" -- and the rule scanner below matched the braces in the
+		// quote, cut the comment in half, and reported the prose either side of a
+		// comma as two selectors. Real findings ended up beside entries like
+		// "is not", which makes the whole block look untrustworthy.
+		const commentSpans: [number, number][] = [];
+		for (const cm of all(css, /\/\*[\s\S]*?\*\//g)) {
+			const from = cm.index ?? 0;
+			commentSpans.push([from, from + cm[0].length]);
+		}
+		const inComment = (i: number) =>
+			commentSpans.some(([from, to]) => i >= from && i < to);
 		// Walk rule by rule. The text between the previous rule and this one's
 		// brace holds the selector AND any comment above it, which is where the
 		// designer says why a column comes off the page.
 		let cursor = 0;
 		for (const rule of all(css, /\{([^{}]*)\}/g)) {
 			const at = rule.index ?? 0;
+			if (inComment(at)) {
+				continue;
+			}
 			const head = css.slice(cursor, at);
 			cursor = at + rule[0].length;
 			const body = rule[1] ?? "";
@@ -187,6 +206,15 @@ function hiddenByCss(raw: string): Hidden[] {
 			for (const sel of selectors.split(",")) {
 				const one = sel.trim();
 				if (!one) {
+					continue;
+				}
+				// A selector names something. Prose that survived a malformed
+				// comment does not, and it is worth dropping rather than
+				// reporting: a findings block with "is not" in it gets ignored
+				// wholesale, including the findings that matter.
+				const looksLikeSelector =
+					/^[\w.#:[>+~*\]()="'-]/.test(one) && !/\s{2,}|[.!?]\s|\n/.test(one);
+				if (!looksLikeSelector) {
 					continue;
 				}
 				const nth = /nth-child\(\s*(\d+)\s*\)/.exec(one);
@@ -268,10 +296,37 @@ function elements(raw: string, sid: string): El[] {
 	for (const m of all(h, /<a\b[^>]*>([\s\S]*?)<\/a>/gi)) {
 		push("action", m[1]);
 	}
+	// A control that a <label> already named must not be read a second time.
+	// A labelled input carries no name or placeholder of its own -- the text is in
+	// the label -- so it falls back to its own type and comes back as a phantom
+	// filter. One setup form produced four: "text", "date", "file", and a
+	// placeholder, sitting beside the twenty-five real fields.
+	//
+	// "Already named" means a field with that label's text is in `out`, so this is
+	// safe whether or not a <label> rule runs above: with one, the duplicate is
+	// dropped; without one, nothing matches and the old behaviour stands. A
+	// control with no label nearby is untouched either way, so a toolbar search
+	// box and a filter select on a table screen keep their kinds.
+	const named = new Set(
+		out.filter((e) => e.kind === "field").map((e) => e.label)
+	);
+	const labels = all(h, /<label[^>]*>([\s\S]*?)<\/label>/gi);
+	const alreadyAField = (at: number) =>
+		labels.some((l) => {
+			const end = (l.index ?? 0) + l[0].length;
+			return end <= at && at - end <= LABEL_REACH && named.has(text(l[1]));
+		});
+
 	for (const m of all(h, /<select[^>]*>/gi)) {
+		if (alreadyAField(m.index ?? 0)) {
+			continue;
+		}
 		push("filter", m[0].match(/name=["']([^"']+)/)?.[1] ?? "select");
 	}
 	for (const m of all(h, /<input[^>]*>/gi)) {
+		if (alreadyAField(m.index ?? 0)) {
+			continue;
+		}
 		const t = m[0].match(/type=["']([^"']+)/)?.[1] ?? "text";
 		const n =
 			m[0].match(/(?:name|placeholder|aria-label)=["']([^"']+)/)?.[1] ?? t;
