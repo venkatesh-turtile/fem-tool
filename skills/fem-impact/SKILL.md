@@ -17,13 +17,45 @@ The phase that turns differences into backend work.
    ```
    1  in the current response schema              cost 0 · FE only
    2  derivable client-side from returned fields  cost 0 · flag perf
-   3  in the DB but not exposed                   additive API · low
-   4  derivable server-side (join, aggregate)     handler + index · medium
-   5  not stored anywhere                         DB + write path + backfill · high
+   3  in THIS module's tables but not exposed     additive API · low
+   4  derivable from THIS module's tables         handler + index · medium
+      (join, aggregate) without crossing a
+      module boundary
+   5  not in this module's backend                DB + write path + backfill · high
+      — including data that exists only in
+      ANOTHER module's tables
    ```
 
    Landing on step 5 is the strongest signal a proposed option is expensive.
    Say so at gate 2.
+
+### The ladder is walked against the module's OWN backend
+
+Rungs 3 and 4 mean *this module's* tables — the ones its endpoints already own.
+A field that lives only in another module's table is **rung 5**, not rung 3.
+
+This is the question the report exists to answer: *the new design shows this
+field; does the current module's backend have it?* If the answer is no, that is
+a gap, and it is reported as a gap whatever some other module happens to store.
+
+Two worked examples, both real:
+
+- **Employees · bank details.** The design puts account number, IFSC and PAN on
+  the employee list. `staff_in_institutes` has none of them; they live in
+  `payout_payroll_profiles`, owned by finance-payout. **Rung 5.** Reporting it
+  as "already stored" would hide both the cross-module work and the
+  authorization decision that comes with it.
+
+- **Departments · start and end time.** The design puts working hours on the
+  department row. `departments` has no time columns; they live in
+  `staff_attendance_configs`, owned by the attendance module. **Rung 5** — the
+  same shape as the bank details, and it was wrongly filed as rung 3 in a
+  signed-off report, which under-priced the change by roughly half.
+
+Where another module does hold the data, say so in the evidence — it is a real
+route and usually the cheaper one. But record it as **a possible source for a
+rung-5 gap**, never as the gap being already filled. The verdict is about this
+module's backend; the source is an implementation option for the plan.
 
 3. **Walk the index**, never the repo:
    `binding → endpoint → handler → tables → tests → dashboards → consumers`.
@@ -68,6 +100,37 @@ This exists because of two mistakes in one day, both in signed-off documents:
 Between them, **nine days of work that already existed**. The search takes
 seconds; comparing a design against the screen and forgetting to compare it
 against the API is the easiest mistake in this workflow to make.
+
+## Rule M — a rung is about THIS module's backend
+
+**Rule M refuses a rung-3 or rung-4 resolution whose evidence cites a table this
+module's endpoints do not own.** Cite the owning endpoint alongside the table:
+
+```bash
+bun .claude/skills/fem-index/scripts/endpoints-for-table.ts cms/departments
+```
+
+If the table's owner is another module, the rung is **5**, and the cross-module
+route belongs in the evidence, not in the verdict.
+
+`validate-outputs.ts` enforces this. For a `resolution` of `ladder step 3` or
+`ladder step 4`, it reads the table files the evidence cites
+(`apps/server/src/database/schema/….ts:line`) and fails when none of them is
+owned by an endpoint in this module. So cite the table file, not only the
+handler that reads it.
+
+Rule O and Rule M are opposite failure modes, and a run can hit both:
+
+| | Mistake | Effect |
+|---|---|---|
+| Rule O | pricing a new endpoint that already exists | over-prices |
+| **Rule M** | calling a field "already stored" because another module stores it | **under-prices** |
+
+Rule M is the more dangerous of the two. Over-pricing gets argued down in
+review; under-pricing is agreed to and discovered during the build. It cost a
+signed-off Departments report roughly half its true estimate — start and end
+time were filed as rung 3 on the strength of `staff_attendance_configs`, a table
+`departments`' endpoints do not own and its screen has never called.
 
 ## Institution shape — settled once, in the config
 

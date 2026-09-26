@@ -228,17 +228,17 @@
 		},
 		{
 			"step": 3,
-			"test": "in the DB but not exposed",
+			"test": "in THIS module's tables but not exposed",
 			"cost": "additive API \u2014 low"
 		},
 		{
 			"step": 4,
-			"test": "derivable server-side (join, aggregate)",
+			"test": "derivable from THIS module's tables (join, aggregate) without crossing a module boundary",
 			"cost": "handler + index \u2014 medium"
 		},
 		{
 			"step": 5,
-			"test": "not stored anywhere",
+			"test": "not in this module's backend \u2014 including data that exists only in ANOTHER module's tables",
 			"cost": "DB + write path + backfill \u2014 high"
 		}
 	],

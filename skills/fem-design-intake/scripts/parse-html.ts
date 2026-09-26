@@ -255,6 +255,13 @@ function elements(raw: string, sid: string): El[] {
 	for (const m of all(h, /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi)) {
 		push("field", m[1]);
 	}
+	// A form field is named by its <label>, not by its input. Designs that wrap
+	// the control (a styled <span> around it) leave the input with an empty
+	// placeholder and no name, so reading inputs alone collapses every text box
+	// to one entry called "text". The label is the only thing carrying meaning.
+	for (const m of all(h, /<label[^>]*>([\s\S]*?)<\/label>/gi)) {
+		push("field", m[1]);
+	}
 	for (const m of all(h, /<button[^>]*>([\s\S]*?)<\/button>/gi)) {
 		push("action", m[1]);
 	}
@@ -303,6 +310,7 @@ const hashes: Record<string, string> = {};
 const screens: Screen[] = [];
 const questions: string[] = [];
 let unparseable = 0;
+let thin = 0;
 
 files.forEach((f, i) => {
 	const raw = readFileSync(join(srcDir, f), "utf8");
@@ -330,6 +338,20 @@ files.forEach((f, i) => {
 		return;
 	}
 	const els = elements(raw, sid);
+	// A design that parses to next to nothing is almost always the parser
+	// failing, not an empty design. A 24,000-line file once gave one field where
+	// it had 99 — every text box collapsed into "text" — and nothing said so.
+	const inputs = (strip(raw).match(/<input\b/gi) ?? []).length;
+	const fields = els.filter((e) => e.kind === "field").length;
+	if (
+		els.length * 20 < p.semanticTags ||
+		(inputs >= 10 && fields * 10 < inputs)
+	) {
+		thin++;
+		questions.push(
+			`**${f} parsed to very little** — ${els.length} element(s), ${fields} field(s) from ${p.semanticTags} semantic tags and ${inputs} inputs. This is almost always the parser missing a pattern, not an empty design. Check the file by hand before P3 runs on it.`
+		);
+	}
 	if (!els.some((e) => e.kind === "empty-state")) {
 		questions.push(`${f}: no empty state visible — is one designed?`);
 	}
@@ -465,6 +487,11 @@ console.log(
 console.log(
 	`  elements ${screens.reduce((n: number, s: Screen) => n + s.elements.length, 0)} · questions ${questions.length}`
 );
+if (thin) {
+	console.error(
+		`\n  WARNING: ${thin} file(s) parsed to far fewer elements than their markup holds — see questions.md.`
+	);
+}
 if (unparseable) {
 	console.error(
 		`\n  ${unparseable} file(s) could not be parsed. P3 MUST NOT run on this output.`
