@@ -663,6 +663,51 @@ if (want("P8")) {
 			}
 		}
 	}
+	// S · a new column, and no instructions for it.
+	// "One additive column, nothing breaking" is true and useless. A developer
+	// then has to work out which schema objects gain the key, which handlers must
+	// select it, and which of the screens importing those schemas actually need a
+	// control -- and this repo forbids select() without explicit columns, so there
+	// is no read that picks it up for free. column-ripple.ts answers all of it
+	// mechanically. REPORT.md must carry that answer, once per key.
+	const rippleReportAt = join(dir, "REPORT.md");
+	if (existsSync(join(dir, "04-impact.json")) && existsSync(rippleReportAt)) {
+		const impactDoc = JSON.parse(
+			readFileSync(join(dir, "04-impact.json"), "utf8")
+		);
+		const NEW_STORAGE = ["additive_column", "new_table_with_relations"];
+		const storing = (impactDoc.changes ?? []).filter(
+			(c: { impact?: Record<string, { rubric?: string[] }> }) =>
+				LAYERS.some((L) =>
+					(c.impact?.[L]?.rubric ?? []).some((k) => NEW_STORAGE.includes(k))
+				)
+		);
+		if (storing.length > 0) {
+			const report = readFileSync(rippleReportAt, "utf8");
+			const missing = storing.filter(
+				(c: { id: string }) => !report.includes(c.id)
+			);
+			if (missing.length > 0) {
+				err(
+					`REPORT.md stores something new (${missing
+						.map((c: { id: string }) => c.id)
+						.join(", ")}) and never names the change. Give every new column or table its own section: the schema objects that gain the key and the ones that must NOT, the handlers, the routes, the ONE screen the design draws it on, and the files that import the schema but need no control — \`bun .claude/skills/fem-index/scripts/column-ripple.ts <table> <column>\``
+				);
+			}
+			const RIPPLE = [
+				/schema object|Zod schema|MUST.{0,20}change/i,
+				/handler/i,
+				/screen|front ?end/i,
+			];
+			const thin = RIPPLE.filter((re) => !re.test(report));
+			if (thin.length > 0) {
+				warn(
+					`REPORT.md prices ${storing.length} new stored key(s) but reads thin on the ripple — a developer still has to work out the schema objects, the handlers and the screens. Run column-ripple.ts and paste it, per key`
+				);
+			}
+		}
+	}
+
 	const summaryAt = join(dir, "SUMMARY.md");
 	if (existsSync(summaryAt)) {
 		const text = readFileSync(summaryAt, "utf8");
