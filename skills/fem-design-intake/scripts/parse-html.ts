@@ -93,6 +93,9 @@ const text = (h: string) =>
 		.trim();
 const all = (h: string, re: RegExp) => [...h.matchAll(re)];
 
+/** How far past a </label> a control still counts as that label's field. */
+const LABEL_REACH = 400;
+
 /** Is there real DOM here, or is it a compiled React bundle? */
 function parseability(raw: string) {
 	const dom = strip(raw);
@@ -167,12 +170,28 @@ function hiddenByCss(raw: string): Hidden[] {
 	const found = new Map<string, Hidden>();
 	for (const style of all(raw, /<style[^>]*>([\s\S]*?)<\/style>/gi)) {
 		const css = style[1] ?? "";
+		// Where every /* ... */ sits, so a rule found INSIDE one can be skipped.
+		// A comment explaining a rule tends to quote it -- "/* .btn { display:none }
+		// is not enough */" -- and the rule scanner below matched the braces in
+		// the quote, cut the comment in half, and reported the prose either side
+		// of a comma as two selectors. Real findings ended up next to entries
+		// like "is not", which makes the whole block look untrustworthy.
+		const commentSpans: [number, number][] = [];
+		for (const cm of all(css, /\/\*[\s\S]*?\*\//g)) {
+			const from = cm.index ?? 0;
+			commentSpans.push([from, from + cm[0].length]);
+		}
+		const inComment = (i: number) =>
+			commentSpans.some(([from, to]) => i >= from && i < to);
 		// Walk rule by rule. The text between the previous rule and this one's
 		// brace holds the selector AND any comment above it, which is where the
 		// designer says why a column comes off the page.
 		let cursor = 0;
 		for (const rule of all(css, /\{([^{}]*)\}/g)) {
 			const at = rule.index ?? 0;
+			if (inComment(at)) {
+				continue;
+			}
 			const head = css.slice(cursor, at);
 			cursor = at + rule[0].length;
 			const body = rule[1] ?? "";
@@ -187,6 +206,15 @@ function hiddenByCss(raw: string): Hidden[] {
 			for (const sel of selectors.split(",")) {
 				const one = sel.trim();
 				if (!one) {
+					continue;
+				}
+				// A selector names something. Prose that survived a malformed
+				// comment does not, and it is worth dropping rather than
+				// reporting: a findings block with "is not" in it gets ignored
+				// wholesale, including the findings that matter.
+				const looksLikeSelector =
+					/^[\w.#:[>+~*\]()="'-]/.test(one) && !/\s{2,}|[.!?]\s|\n/.test(one);
+				if (!looksLikeSelector) {
 					continue;
 				}
 				const nth = /nth-child\(\s*(\d+)\s*\)/.exec(one);
@@ -261,14 +289,54 @@ function elements(raw: string, sid: string): El[] {
 	for (const m of all(h, /<a\b[^>]*>([\s\S]*?)<\/a>/gi)) {
 		push("action", m[1]);
 	}
-	for (const m of all(h, /<select[^>]*>/gi)) {
-		push("filter", m[0].match(/name=["']([^"']+)/)?.[1] ?? "select");
-	}
-	for (const m of all(h, /<input[^>]*>/gi)) {
-		const t = m[0].match(/type=["']([^"']+)/)?.[1] ?? "text";
+	// A <label> names a field, and a control sitting just after one is that
+	// field rather than a filter. There was no rule for <label> at all, so a
+	// setup form parsed to NOTHING: its labels were never read, and its inputs
+	// carry no name, placeholder or aria-label of their own -- the text is in
+	// the label -- so each fell back to its own type and landed as a filter
+	// called "text". An organisation setup screen with fifteen fields and no
+	// filters reported one field and twenty filters, and P3 then read every
+	// field on it as removed.
+	//
+	// Controls with no label keep the OLD classification, so a toolbar search
+	// box or a filter select on a table screen is unaffected.
+	const labels = all(h, /<label[^>]*>([\s\S]*?)<\/label>/gi);
+	const controls = all(h, /<(?:input|select|textarea)\b[^>]*>/gi);
+	const claimed = new Set<number>();
+
+	for (const c of controls) {
+		const at = c.index ?? 0;
+		let nearest = -1;
+		for (let i = 0; i < labels.length; i++) {
+			const end = (labels[i].index ?? 0) + labels[i][0].length;
+			if (end <= at && at - end <= LABEL_REACH && !claimed.has(i)) {
+				nearest = i;
+			}
+		}
+		if (nearest >= 0) {
+			claimed.add(nearest);
+			push("field", labels[nearest][1]);
+			continue;
+		}
+		const tag = c[0].slice(1).toLowerCase();
+		if (tag.startsWith("select")) {
+			push("filter", c[0].match(/name=["']([^"']+)/)?.[1] ?? "select");
+			continue;
+		}
+		if (tag.startsWith("textarea")) {
+			push("field", c[0].match(/(?:name|aria-label)=["']([^"']+)/)?.[1] ?? "text");
+			continue;
+		}
+		const t = c[0].match(/type=["']([^"']+)/)?.[1] ?? "text";
 		const n =
-			m[0].match(/(?:name|placeholder|aria-label)=["']([^"']+)/)?.[1] ?? t;
+			c[0].match(/(?:name|placeholder|aria-label)=["']([^"']+)/)?.[1] ?? t;
 		push(t === "search" ? "search" : "filter", n);
+	}
+	// A label with no control after it still names something on the screen.
+	for (let i = 0; i < labels.length; i++) {
+		if (!claimed.has(i)) {
+			push("field", labels[i][1]);
+		}
 	}
 	for (const m of all(h, /role=["']tab["'][^>]*>([\s\S]*?)</gi)) {
 		push("tab", m[1]);

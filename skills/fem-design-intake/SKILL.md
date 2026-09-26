@@ -50,6 +50,26 @@ Two fixes:
   days, and **NFR-7 changes** from *"parse, never execute"* to *"execute
   sandboxed, no network, then parse"*
 
+## A form is read through its labels
+
+There was no rule for `<label>`, so **a form parsed to nothing.** Its labels were
+never looked at, and its inputs carry no `name`, `placeholder` or `aria-label` of
+their own — the text is in the label — so each input fell back to its own `type`
+and was filed as a *filter* called `"text"`.
+
+An organisation setup screen with fifteen fields and no filters reported **one
+field and twenty filters**, and P3 then read every real field on it as removed.
+
+Each `<label>` is now paired with the control that follows it within 400
+characters and emitted once, as a `field`. A control with no label keeps the old
+classification, so a toolbar search box and a filter select on a table screen are
+unaffected — re-parsing the four modules that had already run changed **no column
+and no action**, and moved only labelled inputs out of `filter`.
+
+Forms are half a CMS: onboarding, settings, profiles, every create and edit
+screen. Before this the tool read tables well and forms not at all, which is why
+the runs that worked were all table-shaped.
+
 ## What the markup declares and the page never shows
 
 **The parser reads markup, not styles.** A column removed with `display:none`
